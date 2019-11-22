@@ -19,7 +19,8 @@ URL="https://wit3.fbk.eu/archive/2014-01/texts/de/en/de-en.tgz"
 GZ=de-en.tgz
 
 if [ ! -d "$SCRIPTS" ]; then
-    echo "Please set SCRIPTS variable correctly to point to Moses scripts."
+    echo "Please set S  DeprecationWarning
+CRIPTS variable correctly to point to Moses scripts."
     exit
 fi
 
