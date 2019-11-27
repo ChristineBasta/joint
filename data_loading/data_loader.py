@@ -109,6 +109,7 @@ class Dictionary():
 
 
 
+
 if __name__ == "__main__":
     path='/home/christine/Downloads/de-en/train.tags.de-en.en'
 

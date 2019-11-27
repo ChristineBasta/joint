@@ -29,6 +29,7 @@ class DataRawTextReader(FairseqDataset):
         self.read_data(path, dictionary)
 
     # any data should come in this format
+    #the file should b
     def read_data(self, path, dictionary):
         with open(path, 'r', encoding='utf-8') as f:
             document_sentences = []
@@ -53,7 +54,7 @@ class DataRawTextReader(FairseqDataset):
                         ).long()
                         document_sentence_tokens.append(tokens)
 
-                    print(tokens)
+                    #print(tokens)
 
                     # self.tokens_list.append(tokens)
                     self.sizes.append(len(tokens))
@@ -93,13 +94,25 @@ class DataRawTextReader(FairseqDataset):
 
 
 if __name__ == "__main__":
-    path = '/home/christine/Phd/Cristina_cooperation/joint/corpus_trial.en'
+    path_src = '/home/christine/Phd/Cristina_cooperation/joint/corpus/train.tags.de-en.en'
+    path_trg = '/home/christine/Phd/Cristina_cooperation/joint/corpus/train.tags.de-en.de'
     # load dictionaries
     # src_dict=
     src_dict = Dictionary.load(
         '/home/christine/Phd/Cristina_cooperation/joint/data-bin/iwslt14.joined-dictionary.31K.de-en/dict.en.txt')
-    # tgt_dict = Dictionary.load(os.path.join(args.data[0], 'dict.{}.txt'.format(args.target_lang)))
+    trg_dict = Dictionary.load(
+        '/home/christine/Phd/Cristina_cooperation/joint/data-bin/iwslt14.joined-dictionary.31K.de-en/dict.de.txt')
+    #tgt_dict = Dictionary.load(os.path.join(args.data[0], 'dict.{}.txt'.format(args.target_lang)))
 
-    textReader = DataRawTextReader(path, src_dict)
-    print(textReader.dictionary_tokens_of_sentences)
-    print(textReader.dictionary_sentences)
+    textReader_src = DataRawTextReader(path_src, src_dict)
+    print(textReader_src.dictionary_tokens_of_sentences)
+    print(textReader_src.dictionary_sentences)
+
+
+    textReader_trg = DataRawTextReader(path_trg, trg_dict)
+    print(textReader_trg.dictionary_tokens_of_sentences)
+    print(textReader_trg.dictionary_sentences)
+
+    #by this we have the two dictionaries
+
+
