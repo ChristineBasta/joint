@@ -12,24 +12,31 @@ from fairseq.data import (
     data_utils,
     indexed_dataset,
     LanguagePairDataset,
-)
+    FairseqDataset)
 
 from fairseq.tasks import FairseqTask, register_task
 
 #should be implemented again ..this whole method
+from data_loading.data_reader import DataRawTextReader
+
+
 def load_langpair_dataset(data_path, split,
                           src, src_dict,
                           tgt, tgt_dict,
                           combine, dataset_impl, upsample_primary,
                           left_pad_source, left_pad_target, max_source_positions, max_target_positions,
 ):
+    #check if the file exists, nothing more
     def split_exists(split, src, tgt, lang, data_path):
         filename = os.path.join(data_path, '{}.{}-{}.{}'.format(split, src, tgt, lang))
         return indexed_dataset.dataset_exists(filename, impl=dataset_impl)
 
     src_datasets = []
+
     tgt_datasets = []
 
+    #to get the file prefix for each split, train, valid or test
+    #check thus
     for k in itertools.count():
         split_k = split + (str(k) if k > 0 else '')
 
@@ -44,15 +51,18 @@ def load_langpair_dataset(data_path, split,
             else:
                 raise FileNotFoundError('Dataset not found: {} ({})'.format(split, data_path))
 
+        textReader_src = DataRawTextReader(prefix + src, src_dict)
+        src_dataset_tokens= textReader_src.dictionary_tokens_of_sentences
+        src_dataset_sentences= textReader_src.dictionary_sentences
+
+        textReader_trg = DataRawTextReader(prefix + tgt, tgt_dict)
+        trg_dataset_tokens = textReader_trg.dictionary_tokens_of_sentences
+        trg_dataset_tokens = textReader_trg.dictionary_sentences
 
 
-
-        src_datasets.append(
-            data_utils.load_indexed_dataset(prefix + src, src_dict, dataset_impl)
-        )
-        tgt_datasets.append(
-            data_utils.load_indexed_dataset(prefix + tgt, tgt_dict, dataset_impl)
-        )
+        #our datasets should be uplaoded here
+        src_datasets.append(textReader_src)
+        tgt_datasets.append(textReader_trg)
 
         print('| {} {} {}-{} {} examples'.format(data_path, split_k, src, tgt, len(src_datasets[-1])))
 
@@ -153,6 +163,7 @@ class TranslationTask(FairseqTask):
         # find language pair automatically
 
         #implement again this part
+        #data_utils.infer_language_pair dets names for trg and src for example src= en and trg=de
         if args.source_lang is None or args.target_lang is None:
             args.source_lang, args.target_lang = data_utils.infer_language_pair(paths[0])
         if args.source_lang is None or args.target_lang is None:
@@ -181,7 +192,7 @@ class TranslationTask(FairseqTask):
 
         # infer langcode
         src, tgt = self.args.source_lang, self.args.target_lang
-        #implement this part
+        #so we loaded it from the dataset
         self.datasets[split] = load_langpair_dataset(
             data_path, split, src, self.src_dict, tgt, self.tgt_dict,
             combine=combine, dataset_impl=self.args.dataset_impl,
@@ -193,9 +204,11 @@ class TranslationTask(FairseqTask):
         )
 
     # implement this method...a3ml fiha eh.-.elmafrood eh
+    #ake sure that src_tokens and src_lengths
+    #what deos this exactly do??? (Christine)
     def build_dataset_for_inference(self, src_tokens, src_lengths):
         return LanguagePairDataset(src_tokens, src_lengths, self.source_dictionary)
-
+    #make sure we do not need to add anthing  (Christine)
     def max_positions(self):
         """Return the max sentence length allowed by the task."""
         return (self.args.max_source_positions, self.args.max_target_positions)
@@ -250,21 +263,27 @@ class TranslationTask(FairseqTask):
         assert isinstance(dataset, FairseqDataset)
 
         # get indices ordered by example size
+        #this should be already fixed in the dataset
         with data_utils.numpy_seed(seed):
             indices = dataset.ordered_indices()
 
         # filter examples that are too large
+        # we can not do this in our case ? (Christine)
         if max_positions is not None:
             indices = data_utils.filter_by_size(
                 indices, dataset.size, max_positions, raise_exception=(not ignore_invalid_inputs),
             )
 
         # create mini-batches with given size constraints
+        # it just adjusts the batch by size
+        # we can not do this in our case ? should be commented? (Christine)
+        #this return mini_batches which has many batches
+        #in our case, how many mini batches, may we return many batches from the dataset
         batch_sampler = data_utils.batch_by_size(
             indices, dataset.num_tokens, max_tokens=max_tokens, max_sentences=max_sentences,
             required_batch_size_multiple=required_batch_size_multiple,
         )
-
+        # batches should be here returned correctly, mini batches should be ???
         # return a reusable, sharded iterator
         return iterators.EpochBatchIterator(
             dataset=dataset,

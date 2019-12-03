@@ -1,6 +1,6 @@
 import torchtext.data.utils as utils
 import torchtext
-from data_loading.data_utils import DataRawTextReader
+from data_loading.data_reader import DataRawTextReader
 import copy
 import torch
 from fairseq.data import (

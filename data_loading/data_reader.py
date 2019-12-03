@@ -65,9 +65,10 @@ class DataRawTextReader(FairseqDataset):
             raise IndexError('index out of range')
 
     # returns the list of sentences for a document
+    # i should refer to the document index
     def __getitem__(self, i):
         self.check_index(i)
-        return self.dictionary[i]
+        return self.dictionary_tokens_of_sentences[i]
 
     # should adapt
     '''

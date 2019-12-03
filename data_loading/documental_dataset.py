@@ -1,7 +1,7 @@
 
 from fairseq.data import FairseqDataset
 import fairseq.data.data_utils as data_utils
-from data_loading.data_utils import DataRawTextReader
+from data_loading.data_reader import DataRawTextReader
 import numpy as np
 import torch
 
@@ -112,21 +112,38 @@ class LanguagePairDataset(FairseqDataset):
             assert src_dict.pad() == tgt_dict.pad()
             assert src_dict.eos() == tgt_dict.eos()
             assert src_dict.unk() == tgt_dict.unk()
+
+        #our src and target
         self.src = src
         self.tgt = tgt
+
+
         self.src_sizes = np.array(src_sizes)
         self.tgt_sizes = np.array(tgt_sizes) if tgt_sizes is not None else None
+
+        #the dictionary of Fairseq
         self.src_dict = src_dict
         self.tgt_dict = tgt_dict
+
+
+
         self.left_pad_source = left_pad_source
         self.left_pad_target = left_pad_target
+
+        #I guess this is the max tokens
         self.max_source_positions = max_source_positions
         self.max_target_positions = max_target_positions
+
+        #always set this to False
         self.shuffle = shuffle
+        #??
         self.input_feeding = input_feeding
+
+        # because eos is not important in source but it is important to stop suggesting in target
         self.remove_eos_from_source = remove_eos_from_source
         self.append_eos_to_target = append_eos_to_target
-
+        self.batch_size= batch_size
+        self.batchLoader = BatchTokenLoader(self.src, self.batch_size)
     #should be reimplemented
     #should I get the batch here or where
     def __getitem__(self, index):
@@ -135,6 +152,10 @@ class LanguagePairDataset(FairseqDataset):
         #so we need to choose what we want to represent by index
         tgt_item = self.tgt[index] if self.tgt is not None else None
         src_item = self.src[index]
+
+        #get a sentence when given index..but should be given a document too
+
+
         # Append EOS to end of tgt sentence if it does not have an EOS and remove
         # EOS from end of src sentence if it exists. This is useful when we use
         # use existing datasets for opposite directions i.e., when we want to
@@ -207,6 +228,7 @@ class LanguagePairDataset(FairseqDataset):
 
     # what should we do with this
     # we do not need ordered indicess..so why we should need this
+    #this hsould return the ordered indixes of the batch
     def ordered_indices(self):
         """Return an ordered list of indices. Batches will be constructed based
         on this order."""
