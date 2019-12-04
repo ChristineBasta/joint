@@ -18,11 +18,13 @@ class DataRawTextReader(FairseqDataset):
 
         self.dictionary_sentences = {}
         self.dictionary_tokens_of_sentences = {}
+
         self.count_documents = 0
 
-        self.size = len(self.dictionary)
+        self.size = len(self.tokens_list)
 
-        # self.tokens_list = []
+
+        self.tokens_list = []
         self.lines = []
         self.sizes = []
 
@@ -43,8 +45,12 @@ class DataRawTextReader(FairseqDataset):
                     self.count_documents += 1
                     self.dictionary_sentences[self.count_documents] = document_sentences
                     self.dictionary_tokens_of_sentences [self.count_documents]= document_sentence_tokens
+
                     document_sentences = []
                     document_sentence_tokens = []
+
+                    self.tokens_list.extend(document_sentence_tokens)
+
                 elif not ls.startswith("<"):
                     if ls.strip() != "":
                         document_sentences.append(ls.strip())
@@ -68,7 +74,7 @@ class DataRawTextReader(FairseqDataset):
     # i should refer to the document index
     def __getitem__(self, i):
         self.check_index(i)
-        return self.dictionary_tokens_of_sentences[i]
+        return self.tokens_list[i]
 
     # should adapt
     '''

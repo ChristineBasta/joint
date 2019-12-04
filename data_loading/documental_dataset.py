@@ -1,7 +1,8 @@
 
 from fairseq.data import FairseqDataset
 import fairseq.data.data_utils as data_utils
-from data_loading.data_reader import DataRawTextReader
+from data_loading.data_reader import DataRawTextRead
+from data_loading.batch_loader_tokens import BatchLoader
 import numpy as np
 import torch
 
@@ -147,6 +148,7 @@ class LanguagePairDataset(FairseqDataset):
     #should be reimplemented
     #should I get the batch here or where
     def __getitem__(self, index):
+
 
         #elmshkla hna bas ....han3ml eh elindex
         #so we need to choose what we want to represent by index

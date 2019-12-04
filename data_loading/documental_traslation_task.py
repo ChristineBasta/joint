@@ -264,8 +264,8 @@ class TranslationTask(FairseqTask):
 
         # get indices ordered by example size
         #this should be already fixed in the dataset
-        with data_utils.numpy_seed(seed):
-            indices = dataset.ordered_indices()
+        #with data_utils.numpy_seed(seed):
+        #    indices = dataset.ordered_indices()
 
         # filter examples that are too large
         # we can not do this in our case ? (Christine)
