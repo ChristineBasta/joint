@@ -18,6 +18,7 @@ class DataRawTextReader(FairseqDataset):
 
         self.dictionary_sentences = {}
         self.dictionary_tokens_of_sentences = {}
+        self.dictionary_documents_indices_sentences={}
 
         self.count_documents = 0
 
@@ -40,16 +41,29 @@ class DataRawTextReader(FairseqDataset):
             for ls in f:
                 #self.lines.append(line.strip('\n'))
                 #print(line)
+
+
                 if ls.startswith("<title>"):
                     ls = re.sub("(^\<title\>)(.*)(\</title\>)", "\g<2>", ls).strip()
                     self.count_documents += 1
+                    #we can get rid later of those two dictionaries
+                    range_indices = []
+                    start_index = len(self.tokens_list) - 1
                     self.dictionary_sentences[self.count_documents] = document_sentences
                     self.dictionary_tokens_of_sentences [self.count_documents]= document_sentence_tokens
+                    self.tokens_list.extend(document_sentence_tokens) # to add all tokes with indices
+                    self.lines.extend(document_sentences) #lines that maps to indices
+                    end_index=len(self.tokens_list)-1
+                    #get the range of indices of the
+                    # Muestra 3,4,5
+                    for x in xrange(start_index, end_index):
+                        range_indices.append(x)
+                    self.dictionary_documents_indices_sentences[self.count_documents]=range_indices
 
                     document_sentences = []
                     document_sentence_tokens = []
 
-                    self.tokens_list.extend(document_sentence_tokens)
+
 
                 elif not ls.startswith("<"):
                     if ls.strip() != "":
@@ -60,10 +74,11 @@ class DataRawTextReader(FairseqDataset):
                         ).long()
                         document_sentence_tokens.append(tokens)
 
+                    self.sizes.append(len(tokens)) #sizes of tokens of lines, just need to know if that is right or not
                     #print(tokens)
 
                     # self.tokens_list.append(tokens)
-                    self.sizes.append(len(tokens))
+
         self.sizes = np.array(self.sizes)
 
     def check_index(self, i):
@@ -77,11 +92,11 @@ class DataRawTextReader(FairseqDataset):
         return self.tokens_list[i]
 
     # should adapt
-    '''
+
     def get_original_text(self, i):
         self.check_index(i)
         return self.lines[i]
-    '''
+
 
     def __del__(self):
         pass

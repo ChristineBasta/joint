@@ -10,14 +10,13 @@ from fairseq import options, utils
 from fairseq.data import (
     ConcatDataset,
     data_utils,
-    indexed_dataset,
-    LanguagePairDataset,
-    FairseqDataset)
+    indexed_dataset)
 
 from fairseq.tasks import FairseqTask, register_task
 
 #should be implemented again ..this whole method
 from data_loading.data_reader import DataRawTextReader
+from data_loading.documental_dataset import LanguagePairDataset
 
 
 def load_langpair_dataset(data_path, split,
@@ -71,6 +70,7 @@ def load_langpair_dataset(data_path, split,
 
     assert len(src_datasets) == len(tgt_datasets)
 
+    #not sure about this part (Christine)
     if len(src_datasets) == 1:
         src_dataset, tgt_dataset = src_datasets[0], tgt_datasets[0]
     else:
@@ -192,6 +192,7 @@ class TranslationTask(FairseqTask):
 
         # infer langcode
         src, tgt = self.args.source_lang, self.args.target_lang
+
         #so we loaded it from the dataset
         self.datasets[split] = load_langpair_dataset(
             data_path, split, src, self.src_dict, tgt, self.tgt_dict,
@@ -264,11 +265,13 @@ class TranslationTask(FairseqTask):
 
         # get indices ordered by example size
         #this should be already fixed in the dataset
-        #with data_utils.numpy_seed(seed):
-        #    indices = dataset.ordered_indices()
+        with data_utils.numpy_seed(seed):
+            #will get our ordered_indices
+            indices = dataset.ordered_indices()
 
         # filter examples that are too large
         # we can not do this in our case ? (Christine)
+        #make sure we have to comment it
         if max_positions is not None:
             indices = data_utils.filter_by_size(
                 indices, dataset.size, max_positions, raise_exception=(not ignore_invalid_inputs),
@@ -279,6 +282,8 @@ class TranslationTask(FairseqTask):
         # we can not do this in our case ? should be commented? (Christine)
         #this return mini_batches which has many batches
         #in our case, how many mini batches, may we return many batches from the dataset
+        #make sure it works fine, should not specify max tokens but should specify max_senstences
+        #as max_sentences iu
         batch_sampler = data_utils.batch_by_size(
             indices, dataset.num_tokens, max_tokens=max_tokens, max_sentences=max_sentences,
             required_batch_size_multiple=required_batch_size_multiple,

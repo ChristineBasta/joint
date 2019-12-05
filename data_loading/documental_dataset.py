@@ -28,23 +28,21 @@ def collate(
     src_tokens = merge('source', left_pad=left_pad_source)
 
     # sort by descending source length
-    #it is just keeping the length so we can keep it
+    #if it changes the order of tokens on the batch level..then no problem, (Christine)
+    # the problem if it was reordering and the batches do not see consequent sentences
     src_lengths = torch.LongTensor([s['source'].numel() for s in samples])
     src_lengths, sort_order = src_lengths.sort(descending=True)
-
     id = id.index_select(0, sort_order)
     src_tokens = src_tokens.index_select(0, sort_order)
 
     prev_output_tokens = None
     target = None
-    #ana msh 3arfa di bt3ml eh belzbt..ya3ny abadalha b eh dlw2ty
-    #should we need it???
+
+    #still not sure what it makes (Christine)
     if samples[0].get('target', None) is not None:
         target = merge('target', left_pad=left_pad_target)
         target = target.index_select(0, sort_order)
         ntokens = sum(len(s['target']) for s in samples)
-
-
         if input_feeding:
             # we create a shifted version of targets for feeding the
             # previous output token(s) into the next decoder step
@@ -144,6 +142,7 @@ class LanguagePairDataset(FairseqDataset):
         self.remove_eos_from_source = remove_eos_from_source
         self.append_eos_to_target = append_eos_to_target
         self.batch_size= batch_size
+
         self.batchLoader = BatchTokenLoader(self.src, self.batch_size)
     #should be reimplemented
     #should I get the batch here or where
@@ -197,7 +196,7 @@ class LanguagePairDataset(FairseqDataset):
                 - `net_input` (dict): the input to the Model, containing keys:
 
                   - `src_tokens` (LongTensor): a padded 2D Tensor of tokens in
-                    the source sentence of shape `(bsz, src_len)`. Padding will
+                    the source sentence of shapeº `(bsz, src_len)`. Padding will
                     appear on the left if *left_pad_source* is ``True``.
                   - `src_lengths` (LongTensor): 1D Tensor of the unpadded
                     lengths of each source sentence of shape `(bsz)`
@@ -228,20 +227,14 @@ class LanguagePairDataset(FairseqDataset):
         filtering a dataset with ``--max-positions``."""
         return (self.src_sizes[index], self.tgt_sizes[index] if self.tgt_sizes is not None else 0)
 
-    # what should we do with this
-    # we do not need ordered indicess..so why we should need this
-    #this hsould return the ordered indixes of the batch
+    # we need to be sure that this goes with the concept of Fairseq
     def ordered_indices(self):
         """Return an ordered list of indices. Batches will be constructed based
         on this order."""
 
-        if self.shuffle:
-            indices = np.random.permutation(len(self))
-        else:
-            indices = np.arange(len(self))
-        if self.tgt_sizes is not None:
-            indices = indices[np.argsort(self.tgt_sizes[indices], kind='mergesort')]
-        return indices[np.argsort(self.src_sizes[indices], kind='mergesort')]
+        indices= self.batchLoader.ordered_indices()
+
+        return indices
 
     @property
     def supports_prefetch(self):

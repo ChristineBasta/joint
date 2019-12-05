@@ -20,7 +20,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
         self.batch = []  # should return tensor, but for now just sentences
         self.random_shuffler = utils.RandomShuffler()
         self.batch_size = batch_size
-        self.total_documents_batched = []
+        self.total_documents_batched = []  # should be emptied each epoch (Carlos)
         self.documents_in_prevbatch = {}
         self.sentence_count = 0
         self.batch_changed=False
@@ -32,7 +32,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
         return len(self.data_reader_object.dictionary_sentences)
 
 
-    def get_batch_i(self, i):
+    def get_batch_next(self):
         # should I empty the batch each batch?
         self.batch = []
         # first batch
@@ -48,9 +48,9 @@ class BatchTokenLoader(torchtext.data.Iterator):
             # if a doc finishes, just remove it and then we will fill random document
             for k, v in prev_items.items():
                 # document has still sentences
-                if (v < (len(self.data_reader_object.dictionary_tokens_of_sentences[k]) - 1)):
+                if (v < (len(self.data_reader_object.dictionary_documents_indices_sentences[k]) - 1)):
                     # load next sentence
-                    self.batch.append(self.data_reader_object.dictionary_tokens_of_sentences[k][v + 1])
+                    self.batch.append(self.data_reader_object.dictionary_documents_indices_sentences[k][v + 1])
                     self.documents_in_prevbatch[k] = v + 1
                     # already in documents_batched_so_no_need_to_add
                     self.sentence_count += 1
@@ -82,7 +82,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
     # range_shuffle: the documents we need to shuffle
     # no_documents_needed: to randomize when a document is finished
     def pick_random_documents(self, range_shuffle, no_documents_needed):
-
+        # Carlos:  we can subtract total from what we have to get the free ones
         random_documents = []
         shuffler_index = self.random_shuffler(range_shuffle)
         for i in shuffler_index:
@@ -136,10 +136,12 @@ class BatchTokenLoader(torchtext.data.Iterator):
 
     # to fill random documents in case of first fill or when documents just finish and we need to replace them
     def fill_batch_with_random_documents(self, random_documents):
+
         for index_random_document in random_documents:
             # add the index of dictionary
             self.sentence_count += 1
-            self.batch.append(self.data_reader_object.dictionary_tokens_of_sentences[index_random_document][0])
+
+            self.batch.append(self.data_reader_object.dictionary_documents_indices_sentences[index_random_document][0])
 
             # should be ordered like the order of the batch
             self.documents_in_prevbatch[index_random_document] = 0
@@ -158,6 +160,13 @@ class BatchTokenLoader(torchtext.data.Iterator):
             trg_batch.append(data_reader_trg_object.dictionary_tokens_of_sentences[k][v])
         return self.add_padding_as_rnn(trg_batch)
 
+    #this is to prepare the ordered indices for the dataset
+    def ordered_indices(self):
+        ordered_indices=[]
+        while(len(ordered_indices)< len(self.data_reader_object.tokens_list)):
+            self.get_batch_next()
+            ordered_indices.extend(self.batch)
+        return ordered_indices
 
 
 if __name__ == "__main__":
@@ -181,7 +190,7 @@ if __name__ == "__main__":
 
 
     for i in range(20):
-        batchLoader.get_batch_i(i)
+        batchLoader.get_batch_next()
         print(batchLoader.batch)
         # we have to load the same batch for the other language
         print(batchLoader.documents_in_prevbatch)
