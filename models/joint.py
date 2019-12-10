@@ -98,6 +98,7 @@ class JointAttentionModel(FairseqModel):
         def build_embedding(dictionary, embed_dim, path=None):
             num_embeddings = len(dictionary)
             padding_idx = dictionary.pad()
+
             emb = Embedding(num_embeddings, embed_dim, padding_idx)
             # if provided, load from preloaded dictionaries
             if path:
@@ -156,6 +157,7 @@ class JointAttentionEncoder(FairseqEncoder):
 
         self.embed_tokens = embed_tokens
         self.embed_scale = math.sqrt(embed_dim)
+        # in our case, should be replaced by the other embeddings(Christine)
         self.embed_positions = PositionalEmbedding(
             args.max_source_positions, embed_dim, self.padding_idx,
             learned=args.encoder_learned_pos,
@@ -181,8 +183,11 @@ class JointAttentionEncoder(FairseqEncoder):
         """
         # embed tokens and positions
         x = self.embed_scale * self.embed_tokens(src_tokens)
+
+        # this should be edited by transformerXL (Christine)
         if self.embed_positions is not None:
             x += self.embed_positions(src_tokens)
+
         # language embedding
         if self.embed_language is not None:
             lang_emb = self.embed_scale * self.embed_language.view(1, 1, -1)
@@ -190,6 +195,8 @@ class JointAttentionEncoder(FairseqEncoder):
         x = F.dropout(x, p=self.dropout, training=self.training)
 
         # B x T x C -> T x B x C
+        #????? (Christine)
+        #why???
         x = x.transpose(0, 1)
 
         # compute padding mask
@@ -257,8 +264,10 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
         self.embed_tokens = embed_tokens
         self.embed_scale = math.sqrt(embed_dim)
 
+        # if the input embed dim coming from encoder is (Christine)
         self.project_in_dim = Linear(input_embed_dim, embed_dim, bias=False) if embed_dim != input_embed_dim else None
-
+        # this should be edited (Christine)
+        #by the new ones
         self.embed_positions = PositionalEmbedding(
             args.max_target_positions, embed_dim, padding_idx,
             learned=args.decoder_learned_pos,
@@ -266,19 +275,26 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
 
         self.embed_language = LanguageEmbedding(embed_dim) if args.language_embeddings else None
 
+        # will we leave this I guess? (Christine)
         self.layers = nn.ModuleList([])
+        # so the new transformer will replace this (Christine)
+        # how many layers are we going to extend
         self.layers.extend([
             ProtectedTransformerDecoderLayer(args, no_encoder_attn=True)
             for _ in range(args.decoder_layers)
         ])
-
+        # will we leave this I guess? (Christine)
+        #this is the layer just for the ouput
         self.project_out_dim = Linear(embed_dim, output_embed_dim, bias=False) \
             if embed_dim != output_embed_dim and not args.tie_adaptive_weights else None
 
+        #???? (Christine)
         if not self.share_input_output_embed:
             self.embed_out = nn.Parameter(torch.Tensor(len(dictionary), output_embed_dim))
             nn.init.normal_(self.embed_out, mean=0, std=output_embed_dim ** -0.5)
         self.register_buffer('version', torch.Tensor([2]))
+
+        # will we leave this I guess? because we need this normalization(Christine)
         self.normalize = args.decoder_normalize_before and final_norm
         if self.normalize:
             self.layer_norm = LayerNorm(embed_dim)
@@ -304,11 +320,13 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
         tgt_len = prev_output_tokens.size(1)
 
         # embed positions
+        ## will be edited with the new positional embeddings ? (Christine)
         positions = self.embed_positions(
             prev_output_tokens,
             incremental_state=incremental_state,
         ) if self.embed_positions is not None else None
 
+        # what is incremental state? (Christine)
         if incremental_state is not None:
             prev_output_tokens = prev_output_tokens[:, -1:]
             if positions is not None:
@@ -331,13 +349,16 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
         x = F.dropout(x, p=self.dropout, training=self.training)
 
         # B x T x C -> T x B x C
+
         x = x.transpose(0, 1)
         attn = None
+        #hidden?
         inner_states = [x]
         source = encoder_out['encoder_out']
         process_source = incremental_state is None or len(incremental_state) == 0
 
         # extended padding mask
+        # this is the padding mask, Carlos was speaking about? (Christine)
         source_padding_mask = encoder_out['encoder_padding_mask']
         if source_padding_mask is not None:
             target_padding_mask = source_padding_mask.new_zeros((source_padding_mask.size(0), tgt_len))
@@ -346,6 +367,8 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
             self_attn_padding_mask = None
 
         # transformer layers
+        #why are these target masking
+        #I think these layers should change
         for i, layer in enumerate(self.layers):
 
             if self.kernel_size_list is not None:
