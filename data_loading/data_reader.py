@@ -21,15 +21,14 @@ class DataRawTextReader(FairseqDataset):
         self.dictionary_documents_indices_sentences={}
 
         self.count_documents = 0
-
-        self.size = len(self.tokens_list)
-
-
         self.tokens_list = []
         self.lines = []
         self.sizes = []
 
+
+
         self.read_data(path, dictionary)
+        self.size = len(self.tokens_list)
 
     # any data should come in this format
     #the file should b
@@ -48,15 +47,15 @@ class DataRawTextReader(FairseqDataset):
                     self.count_documents += 1
                     #we can get rid later of those two dictionaries
                     range_indices = []
-                    start_index = len(self.tokens_list) - 1
+                    start_index = len(self.tokens_list)
                     self.dictionary_sentences[self.count_documents] = document_sentences
                     self.dictionary_tokens_of_sentences [self.count_documents]= document_sentence_tokens
                     self.tokens_list.extend(document_sentence_tokens) # to add all tokes with indices
                     self.lines.extend(document_sentences) #lines that maps to indices
-                    end_index=len(self.tokens_list)-1
+                    end_index=len(self.tokens_list)
                     #get the range of indices of the
                     # Muestra 3,4,5
-                    for x in xrange(start_index, end_index):
+                    for x in range(start_index, end_index):
                         range_indices.append(x)
                     self.dictionary_documents_indices_sentences[self.count_documents]=range_indices
 
@@ -116,8 +115,10 @@ class DataRawTextReader(FairseqDataset):
 
 
 if __name__ == "__main__":
-    path_src = '/home/christine/Phd/Cristina_cooperation/joint/corpus/train.tags.de-en.en'
-    path_trg = '/home/christine/Phd/Cristina_cooperation/joint/corpus/train.tags.de-en.de'
+    #path_src = '/home/christine/Phd/Cristina_cooperation/joint/corpus/train.tags.de-en.en'
+    #path_trg = '/home/christine/Phd/Cristina_cooperation/joint/corpus/train.tags.de-en.de'
+
+    path_src = '/home/christine/Phd/Cristina_cooperation/joint/corpus_trial.en'
     # load dictionaries
     # src_dict=
     src_dict = Dictionary.load(
@@ -127,13 +128,20 @@ if __name__ == "__main__":
     #tgt_dict = Dictionary.load(os.path.join(args.data[0], 'dict.{}.txt'.format(args.target_lang)))
 
     textReader_src = DataRawTextReader(path_src, src_dict)
-    print(textReader_src.dictionary_tokens_of_sentences)
-    print(textReader_src.dictionary_sentences)
+
+    print(textReader_src.tokens_list)
+    print(textReader_src.lines)
+    print(textReader_src.dictionary_documents_indices_sentences)
+
+    print(len(textReader_src.tokens_list))
+    print(len(textReader_src.lines))
+    print(len(textReader_src.dictionary_documents_indices_sentences))
 
 
-    textReader_trg = DataRawTextReader(path_trg, trg_dict)
-    print(textReader_trg.dictionary_tokens_of_sentences)
-    print(textReader_trg.dictionary_sentences)
+
+    #textReader_trg = DataRawTextReader(path_trg, trg_dict)
+    #print(textReader_trg.dictionary_tokens_of_sentences)
+    #print(textReader_trg.dictionary_sentences)
 
     #by this we have the two dictionaries
 

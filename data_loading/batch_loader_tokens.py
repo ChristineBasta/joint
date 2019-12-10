@@ -35,6 +35,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
     def get_batch_next(self):
         # should I empty the batch each batch?
         self.batch = []
+
         # first batch
         if not self.total_documents_batched:
             random_documents = self.pick_random_documents(range(1, (self.get_documents_size() + 1)),
@@ -48,14 +49,17 @@ class BatchTokenLoader(torchtext.data.Iterator):
             # if a doc finishes, just remove it and then we will fill random document
             for k, v in prev_items.items():
                 # document has still sentences
-                if (v < (len(self.data_reader_object.dictionary_documents_indices_sentences[k]) - 1)):
+                doc_length = len(self.data_reader_object.dictionary_documents_indices_sentences[k])
+                first_index_doc=self.data_reader_object.dictionary_documents_indices_sentences[k][0]
+                if (v < ((first_index_doc+doc_length) - 1)):
                     # load next sentence
-                    self.batch.append(self.data_reader_object.dictionary_documents_indices_sentences[k][v + 1])
+                    self.batch.append(v + 1)
                     self.documents_in_prevbatch[k] = v + 1
                     # already in documents_batched_so_no_need_to_add
                     self.sentence_count += 1
                 else:  # this document finishes
                     del (self.documents_in_prevbatch[k])
+
                     #should keep this indices too for later
 
             # SHOULD REMOVE FROM MEMORY OF HIDDEN LAYERS THE INDEX OF THIS BATCH
@@ -68,7 +72,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
 
                 random_documents = self.pick_random_documents(range(1, (self.get_documents_size() + 1)),
                                                               self.indices_to_fill())
-                print(random_documents)
+                #print(random_documents)
 
                 # handling case if documents are finished
                 if (random_documents):
@@ -144,7 +148,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
             self.batch.append(self.data_reader_object.dictionary_documents_indices_sentences[index_random_document][0])
 
             # should be ordered like the order of the batch
-            self.documents_in_prevbatch[index_random_document] = 0
+            self.documents_in_prevbatch[index_random_document] = self.data_reader_object.dictionary_documents_indices_sentences[index_random_document][0]
             self.total_documents_batched.append(index_random_document)
             self.sentence_count += 1
 
@@ -152,21 +156,24 @@ class BatchTokenLoader(torchtext.data.Iterator):
             if (len(self.batch) > self.batch_size):
                 break
 
-    # fill the target batches with the same here
-    # data_reader_trg_object: should be the target reader with its dictionary of sentences and tokens
-    def fill_batch_target(self, data_reader_trg_object):
-        trg_batch = []
-        for k, v in self.documents_in_prevbatch.items():
-            trg_batch.append(data_reader_trg_object.dictionary_tokens_of_sentences[k][v])
-        return self.add_padding_as_rnn(trg_batch)
+
 
     #this is to prepare the ordered indices for the dataset
     def ordered_indices(self):
         ordered_indices=[]
+        #make sure that the condition is right
         while(len(ordered_indices)< len(self.data_reader_object.tokens_list)):
             self.get_batch_next()
+            print(self.documents_in_prevbatch)
+            print(self.batch)
+
             ordered_indices.extend(self.batch)
+            print(ordered_indices)
         return ordered_indices
+
+    # different indices to fill
+    def indices_to_fill(self):
+        return (self.batch_size - len(self.batch))
 
 
 if __name__ == "__main__":
@@ -185,10 +192,10 @@ if __name__ == "__main__":
     #print(sourceTextReader.dictionary_tokens_of_sentences)
     #print(sourceTextReader.dictionary_sentences)
 
-    batchLoader = BatchTokenLoader(sourceTextReader, 6)
+    batchLoader = BatchTokenLoader(sourceTextReader, 4)
     # load till we finish( agree on criteria)
-
-
+    batchLoader.ordered_indices()
+    '''
     for i in range(20):
         batchLoader.get_batch_next()
         print(batchLoader.batch)
@@ -197,4 +204,4 @@ if __name__ == "__main__":
         print(batchLoader.total_documents_batched)
         print('paddings:')
         batchLoader.add_padding_(batchLoader.batch)
-
+    '''

@@ -110,6 +110,14 @@ class BatchLoader(torchtext.data.Iterator):
             if (len(self.batch) > self.batch_size):
                 break
 
+    # fill the target batches with the same here
+    # data_reader_trg_object: should be the target reader with its dictionary of sentences and tokens
+    #has been written for the other class but moved here because it won't be used there
+    def fill_batch_target(self, data_reader_trg_object):
+        trg_batch = []
+        for k, v in self.documents_in_prevbatch.items():
+            trg_batch.append(data_reader_trg_object.dictionary_tokens_of_sentences[k][v])
+        return self.add_padding_as_rnn(trg_batch)
 
 if __name__ == "__main__":
     path = '/home/christine/Phd/Cristina_cooperation/joint/corpus_trial.en'

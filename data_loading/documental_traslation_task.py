@@ -74,6 +74,7 @@ def load_langpair_dataset(data_path, split,
     if len(src_datasets) == 1:
         src_dataset, tgt_dataset = src_datasets[0], tgt_datasets[0]
     else:
+        #should I have to comment this? (Christine)
         sample_ratios = [1] * len(src_datasets)
         sample_ratios[0] = upsample_primary
         src_dataset = ConcatDataset(src_datasets, sample_ratios)
@@ -209,7 +210,9 @@ class TranslationTask(FairseqTask):
     #what deos this exactly do??? (Christine)
     def build_dataset_for_inference(self, src_tokens, src_lengths):
         return LanguagePairDataset(src_tokens, src_lengths, self.source_dictionary)
+
     #make sure we do not need to add anthing  (Christine)
+    # if this is what determines the batch size..so we have to control it..right? (Christine)
     def max_positions(self):
         """Return the max sentence length allowed by the task."""
         return (self.args.max_source_positions, self.args.max_target_positions)
@@ -271,7 +274,7 @@ class TranslationTask(FairseqTask):
 
         # filter examples that are too large
         # we can not do this in our case ? (Christine)
-        #make sure we have to comment it
+        #make sure we have to comment it (Christine)
         if max_positions is not None:
             indices = data_utils.filter_by_size(
                 indices, dataset.size, max_positions, raise_exception=(not ignore_invalid_inputs),
@@ -283,11 +286,12 @@ class TranslationTask(FairseqTask):
         #this return mini_batches which has many batches
         #in our case, how many mini batches, may we return many batches from the dataset
         #make sure it works fine, should not specify max tokens but should specify max_senstences
-        #as max_sentences iu
+        #as max_sentences
         batch_sampler = data_utils.batch_by_size(
             indices, dataset.num_tokens, max_tokens=max_tokens, max_sentences=max_sentences,
             required_batch_size_multiple=required_batch_size_multiple,
         )
+
         # batches should be here returned correctly, mini batches should be ???
         # return a reusable, sharded iterator
         return iterators.EpochBatchIterator(

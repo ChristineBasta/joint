@@ -30,6 +30,7 @@ def collate(
     # sort by descending source length
     #if it changes the order of tokens on the batch level..then no problem, (Christine)
     # the problem if it was reordering and the batches do not see consequent sentences
+    #we should remove then
     src_lengths = torch.LongTensor([s['source'].numel() for s in samples])
     src_lengths, sort_order = src_lengths.sort(descending=True)
     id = id.index_select(0, sort_order)
@@ -106,6 +107,7 @@ class LanguagePairDataset(FairseqDataset):
         left_pad_source=True, left_pad_target=False,
         max_source_positions=1024, max_target_positions=1024,
         shuffle=False, input_feeding=True, remove_eos_from_source=False, append_eos_to_target=False,
+        batch_size=8
     ):
         if tgt_dict is not None:
             assert src_dict.pad() == tgt_dict.pad()
