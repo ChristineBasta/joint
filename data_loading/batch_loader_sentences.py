@@ -50,7 +50,7 @@ class BatchLoader(torchtext.data.Iterator):
                 else:  # this document finishes
                     del (self.documents_in_prevbatch[k])
 
-            # SHOULD REMOVE FROM MEMORY OF HIDDEN LAYERS THE INDEX OF THIS BATCH
+            # SHOULD REMOVE FROM MEMORY OF HIDDEN LAYERS THE INDEX OF THIS BATCH(Christine)
 
             # start of changing index is the size of batch-1 before filling
             if self.indices_to_fill() > 0:

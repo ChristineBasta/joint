@@ -75,6 +75,7 @@ def load_langpair_dataset(data_path, split,
         src_dataset, tgt_dataset = src_datasets[0], tgt_datasets[0]
     else:
         #should I have to comment this? (Christine)
+        #related to use more than one siurce of data
         sample_ratios = [1] * len(src_datasets)
         sample_ratios[0] = upsample_primary
         src_dataset = ConcatDataset(src_datasets, sample_ratios)
@@ -270,16 +271,18 @@ class TranslationTask(FairseqTask):
         #this should be already fixed in the dataset
         with data_utils.numpy_seed(seed):
             #will get our ordered_indices
+            #will be filtering by our size
             indices = dataset.ordered_indices()
 
         # filter examples that are too large
         # we can not do this in our case ? (Christine)
         #make sure we have to comment it (Christine)
+        '''
         if max_positions is not None:
             indices = data_utils.filter_by_size(
                 indices, dataset.size, max_positions, raise_exception=(not ignore_invalid_inputs),
             )
-
+        '''
         # create mini-batches with given size constraints
         # it just adjusts the batch by size
         # we can not do this in our case ? should be commented? (Christine)
@@ -287,6 +290,7 @@ class TranslationTask(FairseqTask):
         #in our case, how many mini batches, may we return many batches from the dataset
         #make sure it works fine, should not specify max tokens but should specify max_senstences
         #as max_sentences
+        #Carlos...edit....the funtion of our minibatching
         batch_sampler = data_utils.batch_by_size(
             indices, dataset.num_tokens, max_tokens=max_tokens, max_sentences=max_sentences,
             required_batch_size_multiple=required_batch_size_multiple,
