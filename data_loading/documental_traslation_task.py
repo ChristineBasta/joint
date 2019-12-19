@@ -5,7 +5,7 @@
 
 import itertools
 import os
-
+import copy
 from fairseq import options, utils
 from fairseq.data import (
     ConcatDataset,
@@ -13,12 +13,94 @@ from fairseq.data import (
     indexed_dataset)
 
 from fairseq.tasks import FairseqTask, register_task
-
 #should be implemented again ..this whole method
 from data_loading.data_reader import DataRawTextReader
 from data_loading.documental_dataset import LanguagePairDataset
 
 
+import numpy as np
+
+
+#max_Sentences only...because in our case the max tokens will be commented all the way to make sure thatw
+def _is_batch_full( batch,  max_sentences):
+    if len(batch) == 0:
+        return 0
+    if max_sentences > 0 and len(batch) == max_sentences:
+        return 1
+    #if max_tokens > 0 and num_tokens > max_tokens:
+    #    return 1
+    return 0
+
+#taken from data_utils
+# max_tokens inm our case should not be added
+def batch_by_size(
+        indices, max_sentences=24
+):
+    """
+    Yield mini-batches of indices bucketed by size. Batches may contain
+    sequences of different lengths.
+    Args:
+        indices (List[int]): ordered list of dataset indices
+        num_tokens_fn (callable): function that returns the number of tokens at
+            a given index
+        max_tokens (int, optional): max number of tokens in each batch
+            (default: None).
+        max_sentences (int, optional): max number of sentences in each
+            batch (default: None).
+        required_batch_size_multiple (int, optional): require batch size to
+            be a multiple of N (default: 1).
+    """
+
+    max_tokens = max_tokens if max_tokens is not None else -1
+    max_sentences = max_sentences if max_sentences is not None else -1
+    bsz_mult = required_batch_size_multiple
+
+    if isinstance(indices, types.GeneratorType):
+        indices = np.fromiter(indices, dtype=np.int64, count=-1)
+
+    return batch_by_size_fast(indices, max_sentences)
+
+#remove all related to number of tokens and sample length as we donot need them
+def batch_by_size_fast(indices, max_sentences):
+
+    batch = []
+    batches = []
+
+    idx=0
+    indices_view = copy.deepcopy(indices)
+
+    for i in range(len(indices_view)):
+        idx = indices_view[i]
+
+        #num_tokens = num_tokens_fn(idx)
+
+        #sample_lens.append(num_tokens)
+        #sample_len = maxmax_sentences(sample_len, num_tokens)
+
+        #assert max_tokens <= 0 or sample_len <= max_tokens, (
+        #    "sentence at index {} of size {} exceeds max_tokens "
+        #    "limit of {}!".format(idx, sample_len, max_tokens)
+        #)
+        #num_tokens = (len(batch) + 1) * sample_len
+
+        if _is_batch_full(batch, max_sentences):
+            #mod_len = max(
+            #    bsz_mult * (len(batch) // bsz_mult),
+            #    len(batch) % bsz_mult,
+            #)
+            batch_size=max_sentences
+            #batches.append(batch[:mod_len])
+            #batch = batch[mod_len:]
+            batches.append(batch[:batch_size])
+            batch = batch[batch_size:]
+            #sample_lens = sample_lens[mod_len:]
+            #sample_len = max(sample_lens) if len(sample_lens) > 0 else 0
+        batch.append(idx)
+    if len(batch) > 0:
+        batches.append(batch)
+    return batches
+
+# should specify the batch_size here
 def load_langpair_dataset(data_path, split,
                           src, src_dict,
                           tgt, tgt_dict,
@@ -91,8 +173,8 @@ def load_langpair_dataset(data_path, split,
     )
 
 
-@register_task('translation')
-class TranslationTask(FairseqTask):
+@register_task('translation_transformer')
+class TranslationTransformerTask(FairseqTask):
     """
     Translate from one (source) language to another (target) language.
 
@@ -240,11 +322,11 @@ class TranslationTask(FairseqTask):
         Args:
             dataset (~fairseq.data.FairseqDataset): dataset to batch
             max_tokens (int, optional): max number of tokens in each batch
-                (default: None).
+            (default: None). (we do not use it anymore and must ensure that everywhere)
             max_sentences (int, optional): max number of sentences in each
                 batch (default: None).
             max_positions (optional): max sentence length supported by the
-                model (default: None).
+                model (default: None). (we do not use it anymore and must ensure that everywhere)
             ignore_invalid_inputs (bool, optional): don't raise Exception for
                 sentences that are too long (default: False).
             required_batch_size_multiple (int, optional): require batch size to
@@ -274,26 +356,13 @@ class TranslationTask(FairseqTask):
             #will be filtering by our size
             indices = dataset.ordered_indices()
 
-        # filter examples that are too large
-        # we can not do this in our case ? (Christine)
-        #make sure we have to comment it (Christine)
-        '''
-        if max_positions is not None:
-            indices = data_utils.filter_by_size(
-                indices, dataset.size, max_positions, raise_exception=(not ignore_invalid_inputs),
-            )
-        '''
-        # create mini-batches with given size constraints
-        # it just adjusts the batch by size
-        # we can not do this in our case ? should be commented? (Christine)
-        #this return mini_batches which has many batches
-        #in our case, how many mini batches, may we return many batches from the dataset
-        #make sure it works fine, should not specify max tokens but should specify max_senstences
-        #as max_sentences
-        #Carlos...edit....the funtion of our minibatching
-        batch_sampler = data_utils.batch_by_size(
-            indices, dataset.num_tokens, max_tokens=max_tokens, max_sentences=max_sentences,
-            required_batch_size_multiple=required_batch_size_multiple,
+        # filter_by_size was removed as we believe we do not need it (Christine)(18-12-2019)
+
+        # create mini-batches which has batches with given size constraints
+        # it just adjusts the batch by size (works by batch_by_size implemented above)
+        # should be tested later if it suits the framework(Christine)(18-12-2019)
+        batch_sampler =batch_by_size(
+            indices, max_sentences=max_sentences
         )
 
         # batches should be here returned correctly, mini batches should be ???
@@ -308,3 +377,6 @@ class TranslationTask(FairseqTask):
             num_workers=num_workers,
             epoch=epoch,
         )
+
+
+

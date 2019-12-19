@@ -1,8 +1,7 @@
 
 from fairseq.data import FairseqDataset
 import fairseq.data.data_utils as data_utils
-from data_loading.data_reader import DataRawTextRead
-from data_loading.batch_loader_tokens import BatchLoader
+from data_loading.batch_loader_tokens import BatchTokenLoader
 import numpy as np
 import torch
 
@@ -28,21 +27,25 @@ def collate(
     src_tokens = merge('source', left_pad=left_pad_source)
 
     # sort by descending source length
-    #if it changes the order of tokens on the batch level..then no problem, (Christine)
     # the problem if it was reordering and the batches do not see consequent sentences
-    #we should remove then
-    src_lengths = torch.LongTensor([s['source'].numel() for s in samples])
-    src_lengths, sort_order = src_lengths.sort(descending=True)
-    id = id.index_select(0, sort_order)
-    src_tokens = src_tokens.index_select(0, sort_order)
+    # we should remove then
+    # The next four sentences commented by Christine (18-12-2019)
+
+    #src_lengths = torch.LongTensor([s['source'].numel() for s in samples])
+    #src_lengths, sort_order = src_lengths.sort(descending=True)
+    #id = id.index_select(0, sort_order)
+    #src_tokens = src_tokens.index_select(0, sort_order)
 
     prev_output_tokens = None
     target = None
 
-    #still not sure what it makes (Christine)
+    #if there is a target
     if samples[0].get('target', None) is not None:
         target = merge('target', left_pad=left_pad_target)
-        target = target.index_select(0, sort_order)
+        # order according to the order to src_tokens
+        # next sentence commented by Christine (18-12-2019)
+        # target = target.index_select(0, sort_order)
+
         ntokens = sum(len(s['target']) for s in samples)
         if input_feeding:
             # we create a shifted version of targets for feeding the
@@ -52,11 +55,15 @@ def collate(
                 left_pad=left_pad_target,
                 move_eos_to_beginning=True,
             )
-            prev_output_tokens = prev_output_tokens.index_select(0, sort_order)
+            # order according to the order to src_tokens
+            # next sentence commented by Christine (18-12-2019)
+            #prev_output_tokens = prev_output_tokens.index_select(0, sort_order)
     else:
         ntokens = sum(len(s['source']) for s in samples)
 
-    #do we need to change anything to this if the batch is already the same dimesniosn
+    #
+    # need to revise if ntokens are got right, and make sure what it affects (18-12-2019)
+    # do we need to change anything to this if the batch is already the same dimensions
     batch = {
         'id': id,
         'nsentences': len(samples),
