@@ -1,6 +1,6 @@
 import torchtext.data.utils as utils
 import torchtext
-from data_loading.data_loader import Dictionary
+from trials.data_loader import Dictionary
 import copy
 
 
