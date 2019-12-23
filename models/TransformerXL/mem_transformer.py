@@ -12,7 +12,8 @@ sys.path.append('utils')
 from pytorch.utils.proj_adaptive_softmax import ProjectedAdaptiveLogSoftmax
 from pytorch.utils.log_uniform_sampler import LogUniformSampler, sample_logits
 
-
+# the idea is to focus on the methods that make the difference of the transformer XL
+# and to integrate it with the joint code
 class PositionalEmbedding(nn.Module):
     def __init__(self, demb):
         super(PositionalEmbedding, self).__init__()
@@ -236,7 +237,7 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
 
         return output
 
-
+# decoder that works with the previous attention
 class RelPartialLearnableDecoderLayer(nn.Module):
     def __init__(self, n_head, d_model, d_head, d_inner, dropout,
                  **kwargs):
@@ -256,6 +257,7 @@ class RelPartialLearnableDecoderLayer(nn.Module):
         return output
 
 
+# the transformer as a whole model
 class MemTransformerLM(nn.Module):
     def __init__(self, n_token, n_layer, n_head, d_model, d_head, d_inner,
                  dropout, dropatt, tie_weight=True, d_embed=None,
@@ -275,6 +277,7 @@ class MemTransformerLM(nn.Module):
 
         # this is not adapted from this work because we do not need it in our work
         # check how this should be changed
+        #make sure to change this with what we need
         self.word_emb = AdaptiveEmbedding(n_token, d_embed, d_model, cutoffs,
                                           div_val=div_val)
 
@@ -299,7 +302,6 @@ class MemTransformerLM(nn.Module):
                         dropatt=dropatt, pre_lnorm=pre_lnorm)
                 )
         #  WE REMOVED OTHER ATTENTION TYPES (Christine)(18-12-2019)
-
         self.sample_softmax = sample_softmax
         # use sampled softmax
         if sample_softmax > 0:
@@ -392,7 +394,7 @@ class MemTransformerLM(nn.Module):
         # the length of the current batch
         klen = mlen + qlen
 
-        # we are not sure we are keeping it or not
+        # we are not sure we are keeping it or not Christine (22-12-2019)
         if self.same_length:
             all_ones = word_emb.new_ones(qlen, klen)
             mask_len = klen - self.mem_len
@@ -412,7 +414,7 @@ class MemTransformerLM(nn.Module):
                                    dtype=word_emb.dtype)
             if self.clamp_len > 0:
                 pos_seq.clamp_(max=self.clamp_len)
-            # po0s_emb is the positional embedding of the sequence, R in the paper
+            # pos_emb is the positional embedding of the sequence, R in the paper
             pos_emb = self.pos_emb(pos_seq)
 
             core_out = self.drop(word_emb)
@@ -422,6 +424,7 @@ class MemTransformerLM(nn.Module):
             for i, layer in enumerate(self.layers):
                 mems_i = None if mems is None else mems[i]
                 # here it goes to the PartialRelLeranablelayer which we have above
+                #so it is creating all the layers here
                 core_out = layer(core_out, pos_emb, self.r_w_bias,
                                  self.r_r_bias, dec_attn_mask=dec_attn_mask, mems=mems_i)
                 hids.append(core_out)
@@ -444,6 +447,7 @@ class MemTransformerLM(nn.Module):
         hidden, new_mems = self._forward(data, mems=mems)
 
         pred_hid = hidden[-tgt_len:]
+        # make sure this is the kind of sample softwax we want or not
         if self.sample_softmax > 0 and self.training:
             assert self.tie_weight
             logit = sample_logits(self.word_emb,

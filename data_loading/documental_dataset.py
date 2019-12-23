@@ -6,8 +6,8 @@ import numpy as np
 import torch
 
 
-#reimplementing this to accomodate to our changes
-#should implement again
+# it is implemented and changed but methods should be tested individually ( 22-12-2019)
+#  make sure that it gets what we wants when we run it using the task
 def collate(
     samples, pad_idx, eos_idx, left_pad_source=True, left_pad_target=False,
     input_feeding=True,
@@ -158,8 +158,7 @@ class LanguagePairDataset(FairseqDataset):
     def __getitem__(self, index):
 
 
-        #elmshkla hna bas ....han3ml eh elindex
-        #so we need to choose what we want to represent by index
+
         tgt_item = self.tgt[index] if self.tgt is not None else None
         src_item = self.src[index]
 

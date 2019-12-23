@@ -13,12 +13,12 @@ from fairseq.data import (
     indexed_dataset)
 
 from fairseq.tasks import FairseqTask, register_task
-#should be implemented again ..this whole method
 from data_loading.data_reader import DataRawTextReader
 from data_loading.documental_dataset import LanguagePairDataset
-
-
 import numpy as np
+
+#the batch_by_size is tested but make sure it goes with the other parts well
+#maybe others methods need a special test or handling (22-12-2019)
 
 
 #max_Sentences only...because in our case the max tokens will be commented all the way to make sure thatw

@@ -7,7 +7,10 @@ from fairseq.data import (
     Dictionary,
     FairseqDataset
 )
+#this is tested except for the sizes and method startinf from start_index
+#do not forget to  make a quick test
 
+#just make sure that this is the format of file we need
 
 class DataRawTextReader(FairseqDataset):
     # load in a dictionary instead that List

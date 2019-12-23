@@ -7,10 +7,22 @@ from fairseq.data import (
     Dictionary,
     data_utils
 )
+
+
 # once we have the documents loading in batch..we have to make sure that the same document is used till
 # Its sentences are finished
 # make sure that all documents are loaded
 # load tokens not sentences, the same like batch_loader_tokens, just loading tokens to have  afull story
+
+# Carlos was commenting of some small changes (Writen in the noteboook to check)..make sure they are implemented when we are back (22-12-2019)
+# 1-that trg only needs eos
+# 2-parse documents in 2 ways ..whatever makes it easier later
+# 3-clean dictionaries before the new epoch starts
+# 4-randomization of documents can work on the free ones only
+# 5-make sure that u have indices that change when deleting a document and know how to inetgarte this in the new architecture
+# 6- when batch sizes start to change just because the documents are beginning to finish, stop filling batches
+# for now we are leaving the padding as they are (maybe a problem later)
+# for now we do not know how to fill the initialization of hidden states the doc when it is entering
 
 class BatchTokenLoader(torchtext.data.Iterator):
     def __init__(self, data_reader_object, batch_size):
@@ -23,14 +35,12 @@ class BatchTokenLoader(torchtext.data.Iterator):
         self.total_documents_batched = []  # should be emptied each epoch (Carlos)
         self.documents_in_prevbatch = {}
         self.sentence_count = 0
-        self.batch_changed=False
-        self.start_index_change=-1
-
+        self.batch_changed = False
+        self.start_index_change = -1
 
     def get_documents_size(self):
-        #print(self.data_reader_object.dictionary_sentences)
+        # print(self.data_reader_object.dictionary_sentences)
         return len(self.data_reader_object.dictionary_sentences)
-
 
     def get_batch_next(self):
         # should I empty the batch each batch?
@@ -50,8 +60,8 @@ class BatchTokenLoader(torchtext.data.Iterator):
             for k, v in prev_items.items():
                 # document has still sentences
                 doc_length = len(self.data_reader_object.dictionary_documents_indices_sentences[k])
-                first_index_doc=self.data_reader_object.dictionary_documents_indices_sentences[k][0]
-                if (v < ((first_index_doc+doc_length) - 1)):
+                first_index_doc = self.data_reader_object.dictionary_documents_indices_sentences[k][0]
+                if (v < ((first_index_doc + doc_length) - 1)):
                     # load next sentence
                     self.batch.append(v + 1)
                     self.documents_in_prevbatch[k] = v + 1
@@ -60,7 +70,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
                 else:  # this document finishes
                     del (self.documents_in_prevbatch[k])
 
-                    #should keep this indices too for later
+                    # should keep this indices too for later
 
             # SHOULD REMOVE FROM MEMORY OF HIDDEN LAYERS THE INDEX OF THIS BATCH(Christine)
 
@@ -72,7 +82,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
 
                 random_documents = self.pick_random_documents(range(1, (self.get_documents_size() + 1)),
                                                               self.indices_to_fill())
-                #print(random_documents)
+                # print(random_documents)
 
                 # handling case if documents are finished
                 if (random_documents):
@@ -80,7 +90,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
 
             # there is a case that the sentences are less than a batch size but the documents finished
             # make sure documents are finished also
-            #batch_size is different..will this make a problem
+            # batch_size is different..will this make a problem
 
     # this should randomize documents, we are getting in the batch
     # range_shuffle: the documents we need to shuffle
@@ -101,11 +111,11 @@ class BatchTokenLoader(torchtext.data.Iterator):
             max_size = self.batch[0].size()
             for batch_item in self.batch:
                 print(batch_item.size())
-                if(batch_item.size() > max_size):
-                    max_size=batch_item.size()
+                if (batch_item.size() > max_size):
+                    max_size = batch_item.size()
                 return max_size
 
-    #get the masking too
+    # get the masking too
     def add_padding(self, sequences):
         """
             :param sequences: list of tensors
@@ -126,17 +136,15 @@ class BatchTokenLoader(torchtext.data.Iterator):
 
         return out_tensor, mask
 
-
     def add_padding_as_rnn(self, sequences):
         """
             :param sequences: list of tensors
             :return:
             """
         if (sequences):
-            tensor=torch.nn.utils.rnn.pad_sequence((sequences), batch_first=True,padding_value=1)
+            tensor = torch.nn.utils.rnn.pad_sequence((sequences), batch_first=True, padding_value=1)
             print(tensor)
         return tensor
-
 
     # to fill random documents in case of first fill or when documents just finish and we need to replace them
     def fill_batch_with_random_documents(self, random_documents):
@@ -148,7 +156,8 @@ class BatchTokenLoader(torchtext.data.Iterator):
             self.batch.append(self.data_reader_object.dictionary_documents_indices_sentences[index_random_document][0])
 
             # should be ordered like the order of the batch
-            self.documents_in_prevbatch[index_random_document] = self.data_reader_object.dictionary_documents_indices_sentences[index_random_document][0]
+            self.documents_in_prevbatch[index_random_document] = \
+            self.data_reader_object.dictionary_documents_indices_sentences[index_random_document][0]
             self.total_documents_batched.append(index_random_document)
             self.sentence_count += 1
 
@@ -156,13 +165,11 @@ class BatchTokenLoader(torchtext.data.Iterator):
             if (len(self.batch) > self.batch_size):
                 break
 
-
-
-    #this is to prepare the ordered indices for the dataset
+    # this is to prepare the ordered indices for the dataset
     def ordered_indices(self):
-        ordered_indices=[]
-        #make sure that the condition is right
-        while(len(ordered_indices)< len(self.data_reader_object.tokens_list)):
+        ordered_indices = []
+        # make sure that the condition is right
+        while (len(ordered_indices) < len(self.data_reader_object.tokens_list)):
             self.get_batch_next()
             print(self.documents_in_prevbatch)
             print(self.batch)
@@ -177,9 +184,6 @@ class BatchTokenLoader(torchtext.data.Iterator):
 
 
 if __name__ == "__main__":
-
-
-
     # test different batch sizes
     # test different loops
     # test different document sizes
@@ -189,8 +193,8 @@ if __name__ == "__main__":
         '/home/christine/Phd/Cristina_cooperation/joint/data-bin/iwslt14.joined-dictionary.31K.de-en/dict.en.txt')
 
     sourceTextReader = DataRawTextReader(path_src, src_dict)
-    #print(sourceTextReader.dictionary_tokens_of_sentences)
-    #print(sourceTextReader.dictionary_sentences)
+    # print(sourceTextReader.dictionary_tokens_of_sentences)
+    # print(sourceTextReader.dictionary_sentences)
 
     batchLoader = BatchTokenLoader(sourceTextReader, 4)
     # load till we finish( agree on criteria)
