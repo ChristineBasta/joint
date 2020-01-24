@@ -243,8 +243,7 @@ class RelMultiHeadAttn(nn.Module):
         raise NotImplementedError
 
 
-# RelPartialLearnableMultiHeadAttn is the "relative positional encoding" we proposed in this work.
-
+# RelPartialLearnableMultiHeadAttn is the "relative positional encoding" they proposed in this work.
 class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
     def __init__(self, *args, **kwargs):
         super(RelPartialLearnableMultiHeadAttn, self).__init__(*args, **kwargs)

@@ -41,7 +41,7 @@ class JointAttentionModel(FairseqModel):
 
     def __init__(self, encoder, decoder):
         super().__init__(encoder, decoder)
-
+        # control the memories, but u need top overwrite the forward of fairmodel (Carlos)
     @staticmethod
     def add_args(parser):
         """Add model-specific arguments to the parser."""
@@ -338,6 +338,7 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
         if self.project_in_dim is not None:
             x = self.project_in_dim(x)
 
+        #forget about in our case (Carlos)
         if positions is not None:
             x += positions
 
@@ -503,6 +504,7 @@ class ProtectedTransformerDecoderLayer(nn.Module):
             self.encoder_attn = None
             self.encoder_attn_layer_norm = None
         else:
+            # we can encapsulate the  transformer xl attention here and leave th rest as it is (Carlos)
             self.encoder_attn = ProtectedMultiheadAttention(
                 self.embed_dim, args.decoder_attention_heads,
                 dropout=args.attention_dropout,

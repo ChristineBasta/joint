@@ -14,6 +14,8 @@ from pytorch.utils.log_uniform_sampler import LogUniformSampler, sample_logits
 
 # the idea is to focus on the methods that make the difference of the transformer XL
 # and to integrate it with the joint code
+# one important thing is to know how to train using the training of
+# TransformerXL with the normal Fairseq transformer
 class PositionalEmbedding(nn.Module):
     def __init__(self, demb):
         super(PositionalEmbedding, self).__init__()
@@ -75,6 +77,7 @@ class PositionwiseFF(nn.Module):
         return output
 
 
+# all sublayers of the model  and embedding layers produce outputs of dimension d_model
 class RelMultiHeadAttn(nn.Module):
     def __init__(self, n_head, d_model, d_head, dropout, dropatt=0,
                  tgt_len=None, ext_len=None, mem_len=None, pre_lnorm=False):
@@ -85,6 +88,7 @@ class RelMultiHeadAttn(nn.Module):
         self.d_head = d_head
         self.dropout = dropout
         # first difference
+        #d_model=dimension of embeddings, will be divided on three and so n_head and d_head
         self.qkv_net = nn.Linear(d_model, 3 * n_head * d_head, bias=False)
 
         self.drop = nn.Dropout(dropout)
@@ -138,7 +142,7 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
     def __init__(self, *args, **kwargs):
         super(RelPartialLearnableMultiHeadAttn, self).__init__(*args, **kwargs)
 
-        # the linear unction is always computig WX+ Bias, by setting bias to zero,
+        # the linear function is always computig WX+ Bias, by setting bias to zero,
         #
         # it is only computing W x which is W R in our case W (k,R) * R(i−j)
         self.r_net = nn.Linear(self.d_model, self.n_head * self.d_head, bias=False)
@@ -171,6 +175,7 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
 
         klen = w_head_k.size(0)
 
+        # is qlen different that klen??
         w_head_q = w_head_q.view(qlen, bsz, self.n_head, self.d_head)  # qlen x bsz x n_head x d_head
         w_head_k = w_head_k.view(klen, bsz, self.n_head, self.d_head)  # qlen x bsz x n_head x d_head
         w_head_v = w_head_v.view(klen, bsz, self.n_head, self.d_head)  # qlen x bsz x n_head x d_head
@@ -181,6 +186,8 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
         # they are computing linear transmformation
         # this is for the bias of the context
         # Equation we follow is : EWq * Wk E
+        #w_head_q is E*Wq
+        #r_w_bias= u
         rw_head_q = w_head_q + r_w_bias  # qlen x bsz x n_head x d_head
         # the r_w_bias seems to be the learnt part u
         # w_head_k Wk*E
