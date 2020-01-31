@@ -9,8 +9,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 sys.path.append('utils')
+
 from pytorch.utils.proj_adaptive_softmax import ProjectedAdaptiveLogSoftmax
 from pytorch.utils.log_uniform_sampler import LogUniformSampler, sample_logits
+
 
 # the idea is to focus on the methods that make the difference of the transformer XL
 # and to integrate it with the joint code
@@ -88,7 +90,7 @@ class RelMultiHeadAttn(nn.Module):
         self.d_head = d_head
         self.dropout = dropout
         # first difference
-        #d_model=dimension of embeddings, will be divided on three and so n_head and d_head
+        # d_model=dimension of embeddings, will be divided on three and so n_head and d_head
         self.qkv_net = nn.Linear(d_model, 3 * n_head * d_head, bias=False)
 
         self.drop = nn.Dropout(dropout)
@@ -152,6 +154,7 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
     # mems = mems[i]
     # r_w_bias starts with parametsr of number of heads and dimensions and then it is learnt during the forward
     def forward(self, w, r, r_w_bias, r_r_bias, attn_mask=None, mems=None):
+      #w is the wordembeddings
         qlen, rlen, bsz = w.size(0), r.size(0), w.size(1)
 
         if mems is not None:
@@ -186,8 +189,8 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
         # they are computing linear transmformation
         # this is for the bias of the context
         # Equation we follow is : EWq * Wk E
-        #w_head_q is E*Wq
-        #r_w_bias= u
+        # w_head_q is E*Wq
+        # r_w_bias= u
         rw_head_q = w_head_q + r_w_bias  # qlen x bsz x n_head x d_head
         # the r_w_bias seems to be the learnt part u
         # w_head_k Wk*E
@@ -211,6 +214,7 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
 
         #### compute attention probability
         # mask
+        #Christine 29-1-2020....should be changed with the other kind of mask
         if attn_mask is not None and attn_mask.any().item():
             if attn_mask.dim() == 2:
                 attn_score = attn_score.float().masked_fill(
@@ -244,6 +248,7 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
 
         return output
 
+
 # decoder that works with the previous attention
 class RelPartialLearnableDecoderLayer(nn.Module):
     def __init__(self, n_head, d_model, d_head, d_inner, dropout,
@@ -264,7 +269,11 @@ class RelPartialLearnableDecoderLayer(nn.Module):
         return output
 
 
-# the transformer as a whole model
+
+
+
+# the transformer as a whole model, we won't take it as a whole,
+# we will just take it as parts integrated in the other
 class MemTransformerLM(nn.Module):
     def __init__(self, n_token, n_layer, n_head, d_model, d_head, d_inner,
                  dropout, dropatt, tie_weight=True, d_embed=None,
@@ -284,7 +293,7 @@ class MemTransformerLM(nn.Module):
 
         # this is not adapted from this work because we do not need it in our work
         # check how this should be changed
-        #make sure to change this with what we need
+        # make sure to change this with what we need
         self.word_emb = AdaptiveEmbedding(n_token, d_embed, d_model, cutoffs,
                                           div_val=div_val)
 
@@ -431,7 +440,7 @@ class MemTransformerLM(nn.Module):
             for i, layer in enumerate(self.layers):
                 mems_i = None if mems is None else mems[i]
                 # here it goes to the PartialRelLeranablelayer which we have above
-                #so it is creating all the layers here
+                # so it is creating all the layers here
                 core_out = layer(core_out, pos_emb, self.r_w_bias,
                                  self.r_r_bias, dec_attn_mask=dec_attn_mask, mems=mems_i)
                 hids.append(core_out)

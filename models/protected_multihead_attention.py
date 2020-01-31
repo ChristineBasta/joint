@@ -15,16 +15,147 @@ from fairseq import utils
 # Adapted from faiserq/modules/multihead_attention to deal with local attention
 # Local attetion masking in combination with padding masking can lead to 
 # all -Inf attention rows. This version detects and corrects this situation
-class ProtectedMultiheadAttention(nn.Module):
+#Christine 31-1-2020
+#adding the parts from the transformer that will make the relative and the multihead attention
+
+class PositionalEmbedding(nn.Module):
+    def __init__(self, demb):
+        super(PositionalEmbedding, self).__init__()
+
+        self.demb = demb
+
+        # ???(Christine)
+        inv_freq = 1 / (10000 ** (torch.arange(0.0, demb, 2.0) / demb))
+        self.register_buffer('inv_freq', inv_freq)
+
+    def forward(self, pos_seq, bsz=None):
+        # outer product of pos_seq and inv_freq
+        sinusoid_inp = torch.ger(pos_seq, self.inv_freq)
+
+        # compute relative positional embedding
+        pos_emb = torch.cat([sinusoid_inp.sin(), sinusoid_inp.cos()], dim=-1)
+
+        if bsz is not None:
+            # first -1 means the size does not change
+            return pos_emb[:, None, :].expand(-1, bsz, -1)
+        else:
+            return pos_emb[:, None, :]
+
+
+class PositionwiseFF(nn.Module):
+    def __init__(self, d_model, d_inner, dropout, pre_lnorm=False):
+        super(PositionwiseFF, self).__init__()
+
+        self.d_model = d_model
+        self.d_inner = d_inner
+        self.dropout = dropout
+
+        # feed forward layer
+        self.CoreNet = nn.Sequential(
+            nn.Linear(d_model, d_inner), nn.ReLU(inplace=True),
+            nn.Dropout(dropout),
+            nn.Linear(d_inner, d_model),
+            nn.Dropout(dropout),
+        )
+        # layer normalization
+        self.layer_norm = nn.LayerNorm(d_model)
+
+        self.pre_lnorm = pre_lnorm
+
+    def forward(self, inp):
+        if self.pre_lnorm:
+            ##### layer normalization + positionwise feed-forward
+            core_out = self.CoreNet(self.layer_norm(inp))
+
+            ##### residual connection
+            output = core_out + inp
+        else:
+            ##### positionwise feed-forward
+            core_out = self.CoreNet(inp)
+
+            ##### residual connection + layer normalization
+            output = self.layer_norm(inp + core_out)
+
+        return output
+
+
+# all sublayers of the model  and embedding layers produce outputs of dimension d_model
+class RelMultiHeadAttn(nn.Module):
+    def __init__(self, n_head, d_model, d_head, dropout, dropatt=0,
+                 tgt_len=None, ext_len=None, mem_len=None, pre_lnorm=False):
+        super(RelMultiHeadAttn, self).__init__()
+
+        self.n_head = n_head
+        self.d_model = d_model
+        self.d_head = d_head
+        self.dropout = dropout
+        # first difference
+        # d_model=dimension of embeddings, will be divided on three and so n_head and d_head
+        self.qkv_net = nn.Linear(d_model, 3 * n_head * d_head, bias=False)
+
+        self.drop = nn.Dropout(dropout)
+        self.dropatt = nn.Dropout(dropatt)
+        self.o_net = nn.Linear(n_head * d_head, d_model, bias=False)
+
+        self.layer_norm = nn.LayerNorm(d_model)
+
+        self.scale = 1 / (d_head ** 0.5)
+
+        self.pre_lnorm = pre_lnorm
+
+    def _parallelogram_mask(self, h, w, left=False):
+        mask = torch.ones((h, w)).byte()
+        m = min(h, w)
+        mask[:m, :m] = torch.triu(mask[:m, :m])
+        mask[-m:, -m:] = torch.tril(mask[-m:, -m:])
+
+        if left:
+            return mask
+        else:
+            return mask.flip(0)
+
+    # Append one "column" of zeros to the left
+    # Reshape the matrix from [3 x 4] into [4 x 3]
+    # Remove the first "row"
+    # Mask out the upper triangle
+    # see issue https://github.com/kimiyoung/transformer-xl/issues/8
+    def _rel_shift(self, x, zero_triu=False):
+        zero_pad = torch.zeros((x.size(0), 1, *x.size()[2:]),
+                               device=x.device, dtype=x.dtype)
+        x_padded = torch.cat([zero_pad, x], dim=1)
+
+        x_padded = x_padded.view(x.size(1) + 1, x.size(0), *x.size()[2:])
+
+        x = x_padded[1:].view_as(x)
+
+        if zero_triu:
+            ones = torch.ones((x.size(0), x.size(1)))
+            x = x * torch.tril(ones, x.size(1) - x.size(0))[:, :, None, None]
+
+        return x
+
+    def forward(self, w, r, attn_mask=None, mems=None):
+        raise NotImplementedError
+
+
+#adding the superclass part to adapt from the transformer
+#Christine (31-1-2020)
+class ProtectedMultiheadAttention(RelMultiHeadAttn):
     """Multi-headed attention.
 
     See "Attention Is All You Need" for more details.
     """
-
+    #already the RelMultiHeadAttention has some of these so ...have to send only what is needed more
     def __init__(self, embed_dim, num_heads, dropout=0., bias=True, add_bias_kv=False, add_zero_attn=False):
         super().__init__()
+        #we need to change this to be similar to the init of protected to be initilaized with similar parameters
+        #tab lw 3yza ab3at elparameters elly fo2 w hagat tanya kaman....a3ml eh?
+        #super(ProtectedMultiheadAttention, self).__init__(*args, **kwargs)
         self.embed_dim = embed_dim
         self.num_heads = num_heads
+
+
+
         self.dropout = dropout
         self.head_dim = embed_dim // num_heads
         assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
@@ -48,6 +179,9 @@ class ProtectedMultiheadAttention(nn.Module):
         self.reset_parameters()
 
         self.onnx_trace = False
+        #(Christine 31-1-2020) for transformer attention
+        #d_model os changed to embedding dimension, n_head to num_heads and d_head to head_dim
+        self.r_net = nn.Linear(self.embed_dim , self.num_heads * self.head_dim, bias=False)
 
     def prepare_for_onnx_export_(self):
         self.onnx_trace = True
@@ -63,8 +197,15 @@ class ProtectedMultiheadAttention(nn.Module):
         if self.bias_v is not None:
             nn.init.xavier_normal_(self.bias_v)
 
+        # the forward method takes  w, r, r_w_bias, r_r_bias,, mems = None
+        # w is the word embeddings..need to be sure again
+        # r is the positional relative embeddings and the other two are biases that need learning
+        # I think here w is any of query, or key or value
+        # we have to add the r, r_w_bias, r_r_bias
     def forward(self, query, key, value, key_padding_mask=None, incremental_state=None,
                 need_weights=True, static_kv=False, attn_mask=None):
+
+
         """Input shape: Time x Batch x Channel
 
         Self-attention can be implemented by passing in the same arguments for
@@ -125,6 +266,10 @@ class ProtectedMultiheadAttention(nn.Module):
             k = k.contiguous().view(-1, bsz * self.num_heads, self.head_dim).transpose(0, 1)
         if v is not None:
             v = v.contiguous().view(-1, bsz * self.num_heads, self.head_dim).transpose(0, 1)
+
+
+
+
 
         if saved_state is not None:
             # saved states are stored with shape (bsz, num_heads, seq_len, head_dim)
@@ -193,6 +338,8 @@ class ProtectedMultiheadAttention(nn.Module):
                 ).type_as(attn_weights)  # FP16 support: cast to float and back
 
 
+        # ghalban attention_Weiths btrepresent elscore
+        #fa momkn
         attn_weights = F.softmax(attn_weights.float(), dim=-1).type_as(attn_weights)
         attn_weights = F.dropout(attn_weights, p=self.dropout, training=self.training)
 
