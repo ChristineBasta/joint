@@ -11,7 +11,8 @@ import torch.nn.functional as F
 
 from fairseq import options
 from fairseq import utils
-from models.TransformerXL import mem_transformer
+
+from fairseq.modules import PositionalEmbedding
 
 from fairseq.models import (
     FairseqIncrementalDecoder, FairseqEncoder, FairseqModel, register_model, register_model_architecture
@@ -25,14 +26,11 @@ class JointAttentionModel(FairseqModel):
     Local Joint Source-Target model from
     `"Joint Source-Target Self Attention with Locality Constraints" (Fonollosa, et al, 2019)
     <https://>`_.
-
     Args:
         encoder (JointAttentionEncoder): the encoder
         decoder (JointAttentionDecoder): the decoder
-
     The joint source-target model provides the following named architectures and
     command-line arguments:
-
     .. argparse::
         :ref: fairseq.models.joint_attention_parser
         :prog:
@@ -138,7 +136,6 @@ class JointAttentionModel(FairseqModel):
 class JointAttentionEncoder(FairseqEncoder):
     """
     JointAttention encoder is used only to compute the source embeddings.
-
     Args:
         args (argparse.Namespace): parsed command-line arguments
         dictionary (~fairseq.data.Dictionary): encoding dictionary
@@ -154,14 +151,12 @@ class JointAttentionEncoder(FairseqEncoder):
         self.padding_idx = embed_tokens.padding_idx
         self.max_source_positions = args.max_source_positions
 
-        # should we change this to adaptive embeddings (Christine 26-1-2020)
         self.embed_tokens = embed_tokens
         self.embed_scale = math.sqrt(embed_dim)
-
-        # embed_dim is the dimensions of the embeddings so we are passing it to the method in transformer xl
-        # changes (transformer_xl)
-        self.embed_positions = mem_transformer.PositionalEmbedding(
-            self.embed_dim
+        # in our case, should be replaced by the other embeddings(Christine)
+        self.embed_positions = PositionalEmbedding(
+            args.max_source_positions, embed_dim, self.padding_idx,
+            learned=args.encoder_learned_pos,
         ) if not args.no_token_positional_embeddings else None
         self.embed_language = LanguageEmbedding(embed_dim) if args.language_embeddings else None
 
@@ -174,7 +169,6 @@ class JointAttentionEncoder(FairseqEncoder):
                 `(batch, src_len)`
             src_lengths (torch.LongTensor): lengths of each source sentence of
                 shape `(batch)`
-
         Returns:
             dict:
                 - **encoder_out** (Tensor): embedding output of shape
@@ -186,7 +180,6 @@ class JointAttentionEncoder(FairseqEncoder):
         x = self.embed_scale * self.embed_tokens(src_tokens)
 
         # this should be edited by transformerXL (Christine)
-        # when I am passing src_tokens, are these src_tokens the same as embeddings_dim
         if self.embed_positions is not None:
             x += self.embed_positions(src_tokens)
 
@@ -214,11 +207,9 @@ class JointAttentionEncoder(FairseqEncoder):
     def reorder_encoder_out(self, encoder_out, new_order):
         """
         Reorder encoder output according to *new_order*.
-
         Args:
             encoder_out: output from the ``forward()`` method
             new_order (LongTensor): desired order
-
         Returns:
             *encoder_out* rearranged according to *new_order*
         """
@@ -241,7 +232,6 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
     """
     JointAttention decoder consisting of *args.decoder_layers* layers. Each layer
     is a :class:`ProtectedTransformerDecoderLayer`.
-
     Args:
         args (argparse.Namespace): parsed command-line arguments
         dictionary (~fairseq.data.Dictionary): decoding dictionary
@@ -263,22 +253,21 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
         padding_idx = embed_tokens.padding_idx
         self.max_target_positions = args.max_target_positions
 
-        # should we change this to adaptive embeddings (Christine 26-1-2020)
         self.embed_tokens = embed_tokens
         self.embed_scale = math.sqrt(embed_dim)
 
-        # if the input embed dim coming from encoder is (Christine 26-1-2020)
+        # if the input embed dim coming from encoder is (Christine)
         self.project_in_dim = Linear(input_embed_dim, embed_dim, bias=False) if embed_dim != input_embed_dim else None
-
-        # embed_dim is the dimensions of the embeddings so we are passing it to the method in transformer xl
-        # changes (transformer_xl)
-        self.embed_positions = mem_transformer.PositionalEmbedding(
-            self.embed_dim
+        # this should be edited (Christine)
+        #by the new ones
+        self.embed_positions = PositionalEmbedding(
+            args.max_target_positions, embed_dim, padding_idx,
+            learned=args.decoder_learned_pos,
         ) if not args.no_token_positional_embeddings else None
 
         self.embed_language = LanguageEmbedding(embed_dim) if args.language_embeddings else None
 
-
+        # will we leave this I guess? (Christine)
         self.layers = nn.ModuleList([])
         # so the new transformer will replace this (Christine)
         # how many layers are we going to extend
@@ -292,13 +281,12 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
             if embed_dim != output_embed_dim and not args.tie_adaptive_weights else None
 
         #???? (Christine)
-
         if not self.share_input_output_embed:
             self.embed_out = nn.Parameter(torch.Tensor(len(dictionary), output_embed_dim))
             nn.init.normal_(self.embed_out, mean=0, std=output_embed_dim ** -0.5)
         self.register_buffer('version', torch.Tensor([2]))
 
-
+        # will we leave this I guess? because we need this normalization(Christine)
         self.normalize = args.decoder_normalize_before and final_norm
         if self.normalize:
             self.layer_norm = LayerNorm(embed_dim)
@@ -313,7 +301,6 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
                 encoder-side attention
             incremental_state (dict): dictionary used for storing state during
                 :ref:`Incremental decoding`
-
         Returns:
             tuple:
                 - the last decoder layer's output of shape `(batch, tgt_len,
@@ -323,9 +310,8 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
         """
         tgt_len = prev_output_tokens.size(1)
 
-
-        # this should be edited by transformerXL (Christine)
-        # when I am passing src_tokens, are these src_tokens the same as embeddings_dim
+        # embed positions
+        ## will be edited with the new positional embeddings ? (Christine)
         positions = self.embed_positions(
             prev_output_tokens,
             incremental_state=incremental_state,
@@ -344,9 +330,8 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
             x = self.project_in_dim(x)
 
         #forget about in our case (Carlos)
-        # as the positional encodings should be later in the transformer  (Christine 26-1-2020)
-        #if positions is not None:
-        #    x += positions
+        if positions is not None:
+            x += positions
 
         # language embedding
         if self.embed_language is not None:
@@ -364,21 +349,20 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
         source = encoder_out['encoder_out']
         process_source = incremental_state is None or len(incremental_state) == 0
 
-
-        # For now we are neglecting this mask to know it effects the system (Christine 27-1-2020)
-        # because i this case we have two types of paddings, coming from the input and from the previous in memory
+        # extended padding mask
+        # this is the padding mask, Carlos was speaking about? (Christine)
         source_padding_mask = encoder_out['encoder_padding_mask']
-        #if source_padding_mask is not None:
-        #    target_padding_mask = source_padding_mask.new_zeros((source_padding_mask.size(0), tgt_len))
-        #    self_attn_padding_mask = torch.cat((source_padding_mask, target_padding_mask), dim=1)
-        #else:
-        self_attn_padding_mask = None
+        if source_padding_mask is not None:
+            target_padding_mask = source_padding_mask.new_zeros((source_padding_mask.size(0), tgt_len))
+            self_attn_padding_mask = torch.cat((source_padding_mask, target_padding_mask), dim=1)
+        else:
+            self_attn_padding_mask = None
 
         # transformer layers
-
+        #why are these target masking
+        #I think these layers should change
         for i, layer in enumerate(self.layers):
 
-            # confused about this target mask vs self attention mask  (Christine 27-1-2020)
             if self.kernel_size_list is not None:
                 target_mask = self.local_mask(x, self.kernel_size_list[i], causal=True, tgt_len=tgt_len)
             elif incremental_state is None:
@@ -479,7 +463,6 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
 # Adapted from fairseq/model/transformer.py to use ProtectedMultiheadAttention
 class ProtectedTransformerDecoderLayer(nn.Module):
     """Decoder layer block.
-
     In the original paper each operation (multi-head attention, encoder
     attention or FFN) is postprocessed with: `dropout -> add residual ->
     layernorm`. In the tensor2tensor code they suggest that learning is more
@@ -487,7 +470,6 @@ class ProtectedTransformerDecoderLayer(nn.Module):
     `dropout -> add residual`. We default to the approach in the paper, but the
     tensor2tensor approach can be enabled by setting
     *args.decoder_normalize_before* to ``True``.
-
     Args:
         args (argparse.Namespace): parsed command-line arguments
         no_encoder_attn (bool, optional): whether to attend to encoder outputs
@@ -512,7 +494,6 @@ class ProtectedTransformerDecoderLayer(nn.Module):
             self.encoder_attn_layer_norm = None
         else:
             # we can encapsulate the  transformer xl attention here and leave th rest as it is (Carlos)
-
             self.encoder_attn = ProtectedMultiheadAttention(
                 self.embed_dim, args.decoder_attention_heads,
                 dropout=args.attention_dropout,
@@ -538,16 +519,10 @@ class ProtectedTransformerDecoderLayer(nn.Module):
             x (Tensor): input to the layer of shape `(seq_len, batch, embed_dim)`
             encoder_padding_mask (ByteTensor): binary ByteTensor of shape
                 `(batch, src_len)` where padding elements are indicated by ``1``.
-
         Returns:
             encoded output of shape `(batch, src_len, embed_dim)`
         """
-
-
         residual = x
-        # my memories and my relative embeddings (Christine 29-11-2020)
-        # do I car about the x after the memory thing or before it
-
         x = self.maybe_layer_norm(self.self_attn_layer_norm, x, before=True)
         if prev_self_attn_state is not None:
             if incremental_state is None:
@@ -559,7 +534,6 @@ class ProtectedTransformerDecoderLayer(nn.Module):
             query=x,
             key=x,
             value=x,
-
             key_padding_mask=self_attn_padding_mask,
             incremental_state=incremental_state,
             need_weights=False,
@@ -622,7 +596,6 @@ def Embedding(num_embeddings, embedding_dim, padding_idx):
     nn.init.normal_(m.weight, mean=0, std=embedding_dim ** -0.5)
     nn.init.constant_(m.weight[padding_idx], 0)
     return m
-
 
 
 def LanguageEmbedding(embedding_dim):

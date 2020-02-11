@@ -18,70 +18,12 @@ from fairseq import utils
 #Christine 31-1-2020
 #adding the parts from the transformer that will make the relative and the multihead attention
 
-class PositionalEmbedding(nn.Module):
-    def __init__(self, demb):
-        super(PositionalEmbedding, self).__init__()
-
-        self.demb = demb
-
-        # ???(Christine)
-        inv_freq = 1 / (10000 ** (torch.arange(0.0, demb, 2.0) / demb))
-        self.register_buffer('inv_freq', inv_freq)
-
-    def forward(self, pos_seq, bsz=None):
-        # outer product of pos_seq and inv_freq
-        sinusoid_inp = torch.ger(pos_seq, self.inv_freq)
-
-        # compute relative positional embedding
-        pos_emb = torch.cat([sinusoid_inp.sin(), sinusoid_inp.cos()], dim=-1)
-
-        if bsz is not None:
-            # first -1 means the size does not change
-            return pos_emb[:, None, :].expand(-1, bsz, -1)
-        else:
-            return pos_emb[:, None, :]
-
-
-class PositionwiseFF(nn.Module):
-    def __init__(self, d_model, d_inner, dropout, pre_lnorm=False):
-        super(PositionwiseFF, self).__init__()
-
-        self.d_model = d_model
-        self.d_inner = d_inner
-        self.dropout = dropout
-
-        # feed forward layer
-        self.CoreNet = nn.Sequential(
-            nn.Linear(d_model, d_inner), nn.ReLU(inplace=True),
-            nn.Dropout(dropout),
-            nn.Linear(d_inner, d_model),
-            nn.Dropout(dropout),
-        )
-        # layer normalization
-        self.layer_norm = nn.LayerNorm(d_model)
-
-        self.pre_lnorm = pre_lnorm
-
-    def forward(self, inp):
-        if self.pre_lnorm:
-            ##### layer normalization + positionwise feed-forward
-            core_out = self.CoreNet(self.layer_norm(inp))
-
-            ##### residual connection
-            output = core_out + inp
-        else:
-            ##### positionwise feed-forward
-            core_out = self.CoreNet(inp)
-
-            ##### residual connection + layer normalization
-            output = self.layer_norm(inp + core_out)
-
-        return output
-
 
 # all sublayers of the model  and embedding layers produce outputs of dimension d_model
 class RelMultiHeadAttn(nn.Module):
-    def __init__(self, n_head, d_model, d_head, dropout, dropatt=0,
+    #self, embed_dim, num_heads, dropout = 0., bias = True, add_bias_kv = False, add_zero_attn = False
+
+    def __init__(self, n_head, d_model, d_head, dropout,
                  tgt_len=None, ext_len=None, mem_len=None, pre_lnorm=False):
         super(RelMultiHeadAttn, self).__init__()
 
@@ -94,7 +36,8 @@ class RelMultiHeadAttn(nn.Module):
         self.qkv_net = nn.Linear(d_model, 3 * n_head * d_head, bias=False)
 
         self.drop = nn.Dropout(dropout)
-        self.dropatt = nn.Dropout(dropatt)
+        #removing this from parameters (Christine 5-2-2020)
+        #self.dropatt = nn.Dropout(dropatt)
         self.o_net = nn.Linear(n_head * d_head, d_model, bias=False)
 
         self.layer_norm = nn.LayerNorm(d_model)
@@ -146,31 +89,49 @@ class ProtectedMultiheadAttention(RelMultiHeadAttn):
     See "Attention Is All You Need" for more details.
     """
     #already the RelMultiHeadAttention has some of these so ...have to send only what is needed more
-    def __init__(self, embed_dim, num_heads, dropout=0., bias=True, add_bias_kv=False, add_zero_attn=False):
-        super().__init__()
+    # self, embed_dim, num_heads, dropout = 0., bias = True, add_bias_kv = False, add_zero_attn = False
+
+    #self, n_head, d_model, d_head, dropout, dropatt=0,tgt_len=None, ext_len=None, mem_len=None, pre_lnorm=False
+    #d_model=Embed_dim
+    #num_heads=n_head
+    #dropatt=0,tgt_len=None, ext_len=None, mem_len=None, pre_lnorm=False ..are the different paarameters from above
+    # bias=True, add_bias_kv=False, add_zero_attn=False
+    def __init__(self, n_head, d_model, d_head, dropout=0.,tgt_len=None, ext_len=None, mem_len=None, pre_lnorm=False, bias=True, add_bias_kv=False, add_zero_attn=False):
+        #super().__init__()
         #we need to change this to be similar to the init of protected to be initilaized with similar parameters
         #tab lw 3yza ab3at elparameters elly fo2 w hagat tanya kaman....a3ml eh?
         #super(ProtectedMultiheadAttention, self).__init__(*args, **kwargs)
-        self.embed_dim = embed_dim
-        self.num_heads = num_heads
 
+        super().__init__(n_head, d_model, d_head, dropout)
+
+        self.n_head = n_head
+        self.d_model = d_model
+        # removing this from the parameters (Christine 5-2-2020)
+        #self.dropatt=dropatt
+        self.tgt_len=tgt_len
+        self.ext_len=ext_len
+        self.mem_len=mem_len
+        self.pre_lnorm=pre_lnorm
 
 
         self.dropout = dropout
-        self.head_dim = embed_dim // num_heads
-        assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
-        self.scaling = self.head_dim ** -0.5
+        self.d_head= d_head   #we need to know how to initialize
 
-        self.in_proj_weight = Parameter(torch.Tensor(3 * embed_dim, embed_dim))
+        #we need this Christine 5-2-2020..bbas sibk dlw2ty
+        #assert self.head_dim * n_head == self.d_model, "embed_dim must be divisible by num_heads"
+        self.scaling = self.d_head ** -0.5
+
+        #replacing all embed_dim by d_model
+        self.in_proj_weight = Parameter(torch.Tensor(3 * d_model, d_model))
         if bias:
-            self.in_proj_bias = Parameter(torch.Tensor(3 * embed_dim))
+            self.in_proj_bias = Parameter(torch.Tensor(3 * d_model))
         else:
             self.register_parameter('in_proj_bias', None)
-        self.out_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
+        self.out_proj = nn.Linear(d_model, d_model, bias=bias)
 
         if add_bias_kv:
-            self.bias_k = Parameter(torch.Tensor(1, 1, embed_dim))
-            self.bias_v = Parameter(torch.Tensor(1, 1, embed_dim))
+            self.bias_k = Parameter(torch.Tensor(1, 1, d_model))
+            self.bias_v = Parameter(torch.Tensor(1, 1, d_model))
         else:
             self.bias_k = self.bias_v = None
 
@@ -181,7 +142,7 @@ class ProtectedMultiheadAttention(RelMultiHeadAttn):
         self.onnx_trace = False
         #(Christine 31-1-2020) for transformer attention
         #d_model os changed to embedding dimension, n_head to num_heads and d_head to head_dim
-        self.r_net = nn.Linear(self.embed_dim , self.num_heads * self.head_dim, bias=False)
+        self.r_net = nn.Linear(self.d_model , self.n_head * self.d_head, bias=False)
 
     def prepare_for_onnx_export_(self):
         self.onnx_trace = True
@@ -198,12 +159,13 @@ class ProtectedMultiheadAttention(RelMultiHeadAttn):
             nn.init.xavier_normal_(self.bias_v)
 
         # the forward method takes  w, r, r_w_bias, r_r_bias,, mems = None
-        # w is the word embeddings..need to be sure again
+        # w is the word embeddings..need to be sure again that it is the query here and that it means the mebddings there
         # r is the positional relative embeddings and the other two are biases that need learning
         # I think here w is any of query, or key or value
+
         # we have to add the r, r_w_bias, r_r_bias
-    def forward(self, query, key, value, key_padding_mask=None, incremental_state=None,
-                need_weights=True, static_kv=False, attn_mask=None):
+    def forward(self, query, key, value,r, r_w_bias, r_r_bias, key_padding_mask=None, incremental_state=None,
+                need_weights=True, static_kv=False, attn_mask=None, mems=None):
 
 
         """Input shape: Time x Batch x Channel
@@ -217,12 +179,146 @@ class ProtectedMultiheadAttention(RelMultiHeadAttn):
 
         qkv_same = query.data_ptr() == key.data_ptr() == value.data_ptr()
         kv_same = key.data_ptr() == value.data_ptr()
+        tgt_len, bsz, embed_dim = query.size() #make sure it is ok, Christine 3-2-2020
 
-        tgt_len, bsz, embed_dim = query.size()
-        assert embed_dim == self.embed_dim
-        assert list(query.size()) == [tgt_len, bsz, embed_dim]
-        assert key.size() == value.size()
+        assert embed_dim== self.d_model,"both embed_dim and d_model should be the same"
+        #we need to make sure if the shape works in both cases
 
+        #transforerxl starts here Christine 3-2-2020 ...so tgt_len is equal to qlen..make sure
+        qlen, rlen, bsz = query.size(0), r.size(0), query.size(1)  # assert list(query.size()) == [tgt_len, bsz, embed_dim]
+        # in the paper they are using w for query, I believe query is more representable
+        w=query
+
+        if mems is not None:
+            cat = torch.cat([mems, w], 0)
+            if self.pre_lnorm:
+                w_heads = self.qkv_net(self.layer_norm(cat))
+            else:
+                w_heads = self.qkv_net(cat)
+            r_head_k = self.r_net(r)
+
+            w_head_q, w_head_k, w_head_v = torch.chunk(w_heads, 3, dim=-1)
+            w_head_q = w_head_q[-qlen:]
+        else:
+            if self.pre_lnorm:
+                w_heads = self.qkv_net(self.layer_norm(w))
+            else:
+                w_heads = self.qkv_net(w)
+            r_head_k = self.r_net(r)
+
+            w_head_q, w_head_k, w_head_v = torch.chunk(w_heads, 3, dim=-1)
+
+        klen = w_head_k.size(0)
+
+        # is qlen different that klen??
+        w_head_q = w_head_q.view(qlen, bsz, self.n_head, self.d_head)  # qlen x bsz x n_head x d_head
+        w_head_k = w_head_k.view(klen, bsz, self.n_head, self.d_head)  # qlen x bsz x n_head x d_head
+        w_head_v = w_head_v.view(klen, bsz, self.n_head, self.d_head)  # qlen x bsz x n_head x d_head
+
+        r_head_k = r_head_k.view(rlen, self.n_head, self.d_head)  # qlen x n_head x d_head
+
+        #### compute attention score
+        # they are computing linear transmformation
+        # this is for the bias of the context
+        # Equation we follow is : EWq * Wk E
+        # w_head_q is E*Wq
+        # r_w_bias= u
+        rw_head_q = w_head_q + r_w_bias  # qlen x bsz x n_head x d_head
+        # the r_w_bias seems to be the learnt part u
+        # w_head_k Wk*E
+        # w_head_k is the common part of the two terms A, C
+        AC = torch.einsum('ibnd,jbnd->ijbn', (rw_head_q, w_head_k))  # qlen x klen x bsz x n_head
+
+        # this for the bias of the relative embeddings
+        rr_head_q = w_head_q + r_r_bias
+        # we do some linear transformation
+        # r_head_k is W(k)*R
+        # r_r_bias is v
+        # w_head_q = E*Wq
+        # r_head_k is the common part of two terms B, D
+        BD = torch.einsum('ibnd,jnd->ijbn', (rr_head_q, r_head_k))  # qlen x klen x bsz x n_head
+        BD = self._rel_shift(BD)
+
+        # [qlen x klen x bsz x n_head]
+        attn_score = AC + BD
+        # score, scale
+        attn_score.mul_(self.scale)
+        #end of taken part from Transformer Xl
+
+        # mask
+        # Christine 3-2-2020....should be changed with the other kind of mask
+        #from here we should use the maks of Adrian insted of the other
+        #gathering both together should be tested for dimensiojn and mask
+        attn_weights=attn_score
+        src_len= klen # need to make sure Christine 3-2-2020
+        tgt_len=qlen  # need to make sure Christine 3-2-2020
+        assert list(attn_weights.size()) == [bsz * self.n_head, tgt_len, src_len]
+
+        if attn_mask is not None:
+            attn_mask = attn_mask.unsqueeze(0)
+            if self.onnx_trace:
+                attn_mask = attn_mask.repeat(attn_weights.size(0), 1, 1)
+            attn_weights += attn_mask
+
+        if key_padding_mask is not None:
+            # don't attend to padding symbols
+            #maybe we don't have to attend to this now as Cralos said, will leave it till further review
+            # Christine 3-2-2020
+            attn_weights = attn_weights.view(bsz, self.n_head, tgt_len, src_len)
+            if self.onnx_trace:
+                attn_weights = torch.where(
+                    key_padding_mask.unsqueeze(1).unsqueeze(2),
+                    torch.Tensor([float("-Inf")]),
+                    attn_weights.float()
+                ).type_as(attn_weights)
+            else:
+                attn_weights = attn_weights.float().masked_fill(
+                    key_padding_mask.unsqueeze(1).unsqueeze(2),
+                    float('-inf'),
+                ).type_as(attn_weights)  # FP16 support: cast to float and back
+            attn_weights = attn_weights.view(bsz * self.n_head, tgt_len, src_len)
+            all_inf = torch.isinf(attn_weights).all(dim=-1)
+            if all_inf.any():
+                attn_weights = attn_weights.float().masked_fill(
+                    all_inf.unsqueeze(-1),
+                    0,
+                ).type_as(attn_weights)  # FP16 support: cast to float and back
+
+        # ghalban attention_Weiths btrepresent elscore
+        # fa momkn
+        attn_weights = F.softmax(attn_weights.float(), dim=-1).type_as(attn_weights)
+        attn_weights = F.dropout(attn_weights, p=self.dropout, training=self.training)
+
+
+
+        v=w_head_v # need to make sure Christine 3-2-2020
+        attn = torch.bmm(attn_weights, v)
+
+        assert list(attn.size()) == [bsz * self.n_head, tgt_len, self.d_head]
+        if (self.onnx_trace and attn.size(1) == 1):
+            # when ONNX tracing a single decoder step (sequence length == 1)
+            # the transpose is a no-op copy before view, thus unnecessary
+            attn = attn.contiguous().view(tgt_len, bsz, self.d_model)
+        else:
+            attn = attn.transpose(0, 1).contiguous().view(tgt_len, bsz, self.d_model)
+        attn = self.out_proj(attn)
+
+        if need_weights:
+            # average attention weights over heads
+            attn_weights = attn_weights.view(bsz, self.n_head, tgt_len, src_len)
+            attn_weights = attn_weights.sum(dim=1) / self.n_head
+        else:
+            attn_weights = None
+
+        # the only remaining part here from transformer Xl is the residual connection and layer normalization
+
+
+
+
+
+
+        # in our case.....need to handle increment state (Christine 3-2-2020)
+        '''
         if incremental_state is not None:
             saved_state = self._get_input_buffer(incremental_state)
             if 'prev_key' in saved_state:
@@ -233,24 +329,11 @@ class ProtectedMultiheadAttention(RelMultiHeadAttn):
                     key = value = None
         else:
             saved_state = None
+        '''
 
-        if qkv_same:
-            # self-attention
-            q, k, v = self.in_proj_qkv(query)
-        elif kv_same:
-            # encoder-decoder attention
-            q = self.in_proj_q(query)
-            if key is None:
-                assert value is None
-                k = v = None
-            else:
-                k, v = self.in_proj_kv(key)
-        else:
-            q = self.in_proj_q(query)
-            k = self.in_proj_k(key)
-            v = self.in_proj_v(value)
-        q *= self.scaling
 
+        #do we need this type of handling for mask computation
+        '''
         if self.bias_k is not None:
             assert self.bias_v is not None
             k = torch.cat([k, self.bias_k.repeat(1, bsz, 1)])
@@ -260,17 +343,15 @@ class ProtectedMultiheadAttention(RelMultiHeadAttn):
             if key_padding_mask is not None:
                 key_padding_mask = torch.cat(
                     [key_padding_mask, key_padding_mask.new_zeros(key_padding_mask.size(0), 1)], dim=1)
-
-        q = q.contiguous().view(tgt_len, bsz * self.num_heads, self.head_dim).transpose(0, 1)
-        if k is not None:
-            k = k.contiguous().view(-1, bsz * self.num_heads, self.head_dim).transpose(0, 1)
-        if v is not None:
-            v = v.contiguous().view(-1, bsz * self.num_heads, self.head_dim).transpose(0, 1)
+        '''
 
 
 
+        #to here handled other way
 
 
+        #to save state, but we still need to save other state not this
+        '''
         if saved_state is not None:
             # saved states are stored with shape (bsz, num_heads, seq_len, head_dim)
             if 'prev_key' in saved_state:
@@ -289,7 +370,7 @@ class ProtectedMultiheadAttention(RelMultiHeadAttn):
             saved_state['prev_value'] = v.view(bsz, self.num_heads, -1, self.head_dim)
 
             self._set_input_buffer(incremental_state, saved_state)
-
+        
         src_len = k.size(1)
 
         if key_padding_mask is not None:
@@ -305,60 +386,8 @@ class ProtectedMultiheadAttention(RelMultiHeadAttn):
             if key_padding_mask is not None:
                 key_padding_mask = torch.cat(
                     [key_padding_mask, torch.zeros(key_padding_mask.size(0), 1).type_as(key_padding_mask)], dim=1)
+        '''
 
-        attn_weights = torch.bmm(q, k.transpose(1, 2))
-        assert list(attn_weights.size()) == [bsz * self.num_heads, tgt_len, src_len]
-
-        if attn_mask is not None:
-            attn_mask = attn_mask.unsqueeze(0)
-            if self.onnx_trace:
-                attn_mask = attn_mask.repeat(attn_weights.size(0), 1, 1)
-            attn_weights += attn_mask
-
-        if key_padding_mask is not None:
-            # don't attend to padding symbols
-            attn_weights = attn_weights.view(bsz, self.num_heads, tgt_len, src_len)
-            if self.onnx_trace:
-                attn_weights = torch.where(
-                    key_padding_mask.unsqueeze(1).unsqueeze(2),
-                    torch.Tensor([float("-Inf")]),
-                    attn_weights.float()
-                ).type_as(attn_weights)
-            else:
-                attn_weights = attn_weights.float().masked_fill(
-                    key_padding_mask.unsqueeze(1).unsqueeze(2),
-                    float('-inf'),
-                ).type_as(attn_weights)  # FP16 support: cast to float and back
-            attn_weights = attn_weights.view(bsz * self.num_heads, tgt_len, src_len)
-            all_inf = torch.isinf(attn_weights).all(dim=-1)
-            if all_inf.any():
-                attn_weights = attn_weights.float().masked_fill(
-                    all_inf.unsqueeze(-1),
-                    0,
-                ).type_as(attn_weights)  # FP16 support: cast to float and back
-
-
-        # ghalban attention_Weiths btrepresent elscore
-        #fa momkn
-        attn_weights = F.softmax(attn_weights.float(), dim=-1).type_as(attn_weights)
-        attn_weights = F.dropout(attn_weights, p=self.dropout, training=self.training)
-
-        attn = torch.bmm(attn_weights, v)
-        assert list(attn.size()) == [bsz * self.num_heads, tgt_len, self.head_dim]
-        if (self.onnx_trace and attn.size(1) == 1):
-            # when ONNX tracing a single decoder step (sequence length == 1)
-            # the transpose is a no-op copy before view, thus unnecessary
-            attn = attn.contiguous().view(tgt_len, bsz, embed_dim)
-        else:
-            attn = attn.transpose(0, 1).contiguous().view(tgt_len, bsz, embed_dim)
-        attn = self.out_proj(attn)
-
-        if need_weights:
-            # average attention weights over heads
-            attn_weights = attn_weights.view(bsz, self.num_heads, tgt_len, src_len)
-            attn_weights = attn_weights.sum(dim=1) / self.num_heads
-        else:
-            attn_weights = None
 
         return attn, attn_weights
 
@@ -366,16 +395,16 @@ class ProtectedMultiheadAttention(RelMultiHeadAttn):
         return self._in_proj(query).chunk(3, dim=-1)
 
     def in_proj_kv(self, key):
-        return self._in_proj(key, start=self.embed_dim).chunk(2, dim=-1)
+        return self._in_proj(key, start=self.d_model).chunk(2, dim=-1)
 
     def in_proj_q(self, query):
-        return self._in_proj(query, end=self.embed_dim)
+        return self._in_proj(query, end=self.d_model)
 
     def in_proj_k(self, key):
-        return self._in_proj(key, start=self.embed_dim, end=2 * self.embed_dim)
+        return self._in_proj(key, start=self.d_model, end=2 * self.d_model)
 
     def in_proj_v(self, value):
-        return self._in_proj(value, start=2 * self.embed_dim)
+        return self._in_proj(value, start=2 * self.d_model)
 
     def _in_proj(self, input, start=0, end=None):
         weight = self.in_proj_weight

@@ -274,7 +274,7 @@ if args.restart:
     model.apply(update_dropatt)
 else:
     model = MemTransformerLM(ntokens, args.n_layer, args.n_head, args.d_model,
-        args.d_head, args.d_inner, args.dropout, args.dropatt,
+        args.d_head, args.d_inner,args.dropout, args.dropatt,
         tie_weight=args.tied, d_embed=args.d_embed, div_val=args.div_val,
         tie_projs=tie_projs, pre_lnorm=args.pre_lnorm, tgt_len=args.tgt_len,
         ext_len=args.ext_len, mem_len=args.mem_len, cutoffs=cutoffs,
