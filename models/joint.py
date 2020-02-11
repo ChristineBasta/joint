@@ -639,7 +639,19 @@ class ProtectedTransformerDecoderLayer(nn.Module):
         """
         #ghalban hna han7tag n7ot elwasla bin elpositiuoal welattention elgdid
 
-        #Christine (5-2-2020)
+        #Christine (11-2-2020)
+        #this should be adapted for the new positional embeddings
+        #not sure ..it should be adapted here or not
+        klen = mlen + qlen
+        pos_seq = torch.arange(klen - 1, -1, -1.0, device=word_emb.device,
+                               dtype=word_emb.dtype)
+        if self.clamp_len > 0:
+            pos_seq.clamp_(max=self.clamp_len)
+        # pos_emb is the positional embedding of the sequence, R in the paper
+        pos_emb = self.pos_emb(pos_seq)
+
+
+
         residual = x
         x = self.maybe_layer_norm(self.self_attn_layer_norm, x, before=True)
         if prev_self_attn_state is not None:
