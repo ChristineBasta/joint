@@ -315,7 +315,7 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
         if self.normalize:
             self.layer_norm = LayerNorm(embed_dim)
 
-    def forward(self, prev_output_tokens, encoder_out, incremental_state=None):
+    def forward(self, prev_output_tokens, encoder_out,  mems=None, incremental_state=None):
         """
         Args:
             input (dict): with
@@ -613,7 +613,8 @@ class ProtectedTransformerDecoderLayer(nn.Module):
         self.need_attn = True
         # Christine (5-2-2020), changed for transformer ..should be put here
         #for relative positional
-        self.pos_ff = PositionwiseFF(self.embed_dim, args.d_inner, self.dropout ,pre_lnorm=args.pre_lnorm)
+        #after talking with Carlos, not sure that pos_ff is important
+        #self.pos_ff = PositionwiseFF(self.embed_dim, args.d_inner, self.dropout ,pre_lnorm=args.pre_lnorm)
         self.onnx_trace = False
         self.pos_emb = PositionalEmbedding(self.embed_dim)
         self.r_w_bias = nn.Parameter(torch.Tensor(self.n_heads, self.d_heads))
@@ -626,7 +627,7 @@ class ProtectedTransformerDecoderLayer(nn.Module):
 
 
 
-    def forward(self, x, encoder_out, encoder_padding_mask, incremental_state,
+    def forward(self, x, encoder_out, encoder_padding_mask, incremental_state,  mems=None,
                 prev_self_attn_state=None, prev_attn_state=None, self_attn_mask=None,
                 self_attn_padding_mask=None):
         """
@@ -643,11 +644,16 @@ class ProtectedTransformerDecoderLayer(nn.Module):
         #Christine (11-2-2020)
         #this should be adapted for the new positional embeddings
         #not sure ..it should be adapted here or not
+
+        qlen,bsz, emb_size= x.size()
+        mlen = mems[0].size(0) if mems is not None else 0
+        # the length of the current batch
         klen = mlen + qlen
-        pos_seq = torch.arange(klen - 1, -1, -1.0, device=word_emb.device,
-                               dtype=word_emb.dtype)
-        if self.clamp_len > 0:
-            pos_seq.clamp_(max=self.clamp_len)
+        # Christine (12-2-2020)...remember to change the device and type ...for now I am removing them
+        pos_seq = torch.arange(klen - 1, -1, -1.0)
+        # Christine (12-2-2020)...remember to add this when it seems importat later
+        #if self.clamp_len > 0:
+        #    pos_seq.clamp_(max=self.clamp_len)
         # pos_emb is the positional embedding of the sequence, R in the paper
         pos_emb = self.pos_emb(pos_seq)
 
@@ -667,7 +673,7 @@ class ProtectedTransformerDecoderLayer(nn.Module):
             value=x,
             #here we should add the r and the biasesChristine (5-2-2020)
             #need editing(7-2-2020)
-            r=self.pos_emb,
+            r=pos_emb,
             r_w_bias=self.r_w_bias,
             r_r_bias=self.r_r_bias,
             key_padding_mask=self_attn_padding_mask,
@@ -694,7 +700,7 @@ class ProtectedTransformerDecoderLayer(nn.Module):
                 key=encoder_out,
                 value=encoder_out,
                 # need editing(7-2-2020)
-                r=self.pos_emb,
+                r=pos_emb,
                 r_w_bias=self.r_w_bias,
                 r_r_bias=self.r_r_bias,
                 key_padding_mask=encoder_padding_mask,

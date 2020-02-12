@@ -404,6 +404,7 @@ class MemTransformerLM(nn.Module):
     def _forward(self, dec_inp, mems=None):
         qlen, bsz = dec_inp.size()
 
+        #take care of this Christine (12-2-2020)
         word_emb = self.word_emb(dec_inp)
         # this is the number of tokens that are in the sentences in the previous batch in the memory
         mlen = mems[0].size(0) if mems is not None else 0
