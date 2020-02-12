@@ -389,6 +389,7 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
         # transformer layers
         # why are these target masking
         # I think these layers should change
+        #should change them too to be able to forward right to the protected multi attention (Christine 11-2-2020)
         for i, layer in enumerate(self.layers):
 
             if self.kernel_size_list is not None:
