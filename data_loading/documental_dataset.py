@@ -30,8 +30,8 @@ def collate(
     # the problem if it was reordering and the batches do not see consequent sentences
     # we should remove then
     # The next four sentences commented by Christine (18-12-2019)
-
-    #src_lengths = torch.LongTensor([s['source'].numel() for s in samples])
+    #need only this to send the parameters, but we are supposed not to need them Christine (27-2-2020)
+    src_lengths = torch.LongTensor([s['source'].numel() for s in samples])
     #src_lengths, sort_order = src_lengths.sort(descending=True)
     #id = id.index_select(0, sort_order)
     #src_tokens = src_tokens.index_select(0, sort_order)

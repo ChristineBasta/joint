@@ -57,6 +57,8 @@ class BatchTokenLoader(torchtext.data.Iterator):
             prev_items = copy.deepcopy(self.documents_in_prevbatch)
             # loop on the items oif dictionary to see which document finshes and which is not
             # if a doc finishes, just remove it and then we will fill random document
+            index_iterator=0
+            deleted_indices=[]
             for k, v in prev_items.items():
                 # document has still sentences
                 doc_length = len(self.data_reader_object.dictionary_documents_indices_sentences[k])
@@ -69,8 +71,11 @@ class BatchTokenLoader(torchtext.data.Iterator):
                     self.sentence_count += 1
                 else:  # this document finishes
                     del (self.documents_in_prevbatch[k])
+                    deleted_indices.append(index_iterator)
+                index_iterator=index_iterator+1
 
                     # should keep this indices too for later
+
 
             # SHOULD REMOVE FROM MEMORY OF HIDDEN LAYERS THE INDEX OF THIS BATCH(Christine)
 
@@ -91,6 +96,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
             # there is a case that the sentences are less than a batch size but the documents finished
             # make sure documents are finished also
             # batch_size is different..will this make a problem
+
 
     # this should randomize documents, we are getting in the batch
     # range_shuffle: the documents we need to shuffle
@@ -156,6 +162,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
             self.batch.append(self.data_reader_object.dictionary_documents_indices_sentences[index_random_document][0])
 
             # should be ordered like the order of the batch
+            #self.documents_in_prevbatch[index_random_document] = self.data_reader_object.dictionary_documents_indices_sentences[index_random_document][0]
             self.documents_in_prevbatch[index_random_document] = \
             self.data_reader_object.dictionary_documents_indices_sentences[index_random_document][0]
             self.total_documents_batched.append(index_random_document)
@@ -169,7 +176,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
     def ordered_indices(self):
         ordered_indices = []
         # make sure that the condition is right
-        while (len(ordered_indices) < len(self.data_reader_object.tokens_list)):
+        while (len(ordered_indices)< len(self.data_reader_object.tokens_list)):
             self.get_batch_next()
             print(self.documents_in_prevbatch)
             print(self.batch)
@@ -188,9 +195,8 @@ if __name__ == "__main__":
     # test different loops
     # test different document sizes
 
-    path_src = '/home/christine/Phd/Cristina_cooperation/joint/corpus_trial.en'
-    src_dict = Dictionary.load(
-        '/home/christine/Phd/Cristina_cooperation/joint/data-bin/iwslt14.joined-dictionary.31K.de-en/dict.en.txt')
+    path_src = '../corpus_trial.en'
+    src_dict = Dictionary.load('../data-bin/iwslt14.joined-dictionary.31K.de-en/dict.en.txt')
 
     sourceTextReader = DataRawTextReader(path_src, src_dict)
     # print(sourceTextReader.dictionary_tokens_of_sentences)

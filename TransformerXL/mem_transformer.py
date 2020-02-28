@@ -143,7 +143,7 @@ class MultiHeadAttn(nn.Module):
             elif attn_mask.dim() == 3:
                 attn_score.masked_fill_(attn_mask[:, :, :, None], -float('inf'))
 
-        # [qlen x klen x bsz x n_head]
+        # [qlen x klen x bsz x n_headd]
         # softmax
         attn_prob = F.softmax(attn_score, dim=1)
         attn_prob = self.dropatt(attn_prob)

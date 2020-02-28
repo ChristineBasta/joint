@@ -10,12 +10,14 @@ from fairseq import options, utils
 from fairseq.data import (
     ConcatDataset,
     data_utils,
-    indexed_dataset)
+    indexed_dataset, FairseqDataset)
 
 from fairseq.tasks import FairseqTask, register_task
 from data_loading.data_reader import DataRawTextReader
 from data_loading.documental_dataset import LanguagePairDataset
 import numpy as np
+import types
+import fairseq.data.iterators as iterators
 
 #the batch_by_size is tested but make sure it goes with the other parts well
 #maybe others methods need a special test or handling (22-12-2019)
@@ -33,8 +35,10 @@ def _is_batch_full( batch,  max_sentences):
 
 #taken from data_utils
 # max_tokens inm our case should not be added
+# we have to handle max_sentences .....to take care if it makes any problem Christine 27-2-2020
 def batch_by_size(
-        indices, max_sentences=24
+        indices, max_sentences=24,  max_tokens=None,
+    required_batch_size_multiple=1,
 ):
     """
     Yield mini-batches of indices bucketed by size. Batches may contain
