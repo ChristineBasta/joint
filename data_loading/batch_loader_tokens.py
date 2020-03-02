@@ -14,14 +14,15 @@ from fairseq.data import (
 # make sure that all documents are loaded
 # load tokens not sentences, the same like batch_loader_tokens, just loading tokens to have  afull story
 
-# Carlos was commenting of some small changes (Writen in the noteboook to check)..make sure they are implemented when we are back (22-12-2019)
-# 1-that trg only needs eos
-# 2-parse documents in 2 ways ..whatever makes it easier later
-# 3-clean dictionaries before the new epoch starts
+# Carlos was commenting of some small changes (2-3-2020)
+# 1-that trg only needs eos (check it in dataset not here) (Append_eos _target should be sst to TRue))
+# ?? 2-parse documents in 2 ways ..whatever makes it easier later
+# ?? 3-clean dictionaries before the new epoch starts
 # 4-randomization of documents can work on the free ones only
-# 5-make sure that u have indices that change when deleting a document and know how to inetgarte this in the new architecture
-# 6- when batch sizes start to change just because the documents are beginning to finish, stop filling batches
+# 5-make sure that u have indices that change when deleting a document and know how to inetgarte this in the new architecture (implemented here...not integrated)
+# 6- when batch sizes start to change just because the documents are beginning to finish, stop filling batches (done here)
 # for now we are leaving the padding as they are (maybe a problem later)
+# the padding, the initialization, target and source masking are all issues to look at later
 # for now we do not know how to fill the initialization of hidden states the doc when it is entering
 
 class BatchTokenLoader(torchtext.data.Iterator):
@@ -45,7 +46,9 @@ class BatchTokenLoader(torchtext.data.Iterator):
     def get_batch_next(self):
         # should I empty the batch each batch?
         self.batch = []
-
+        deleted_indices = []
+        added_indices = []
+        index_iterator = 0
         # first batch
         if not self.total_documents_batched:
             random_documents = self.pick_random_documents(range(1, (self.get_documents_size() + 1)),
@@ -57,9 +60,8 @@ class BatchTokenLoader(torchtext.data.Iterator):
             prev_items = copy.deepcopy(self.documents_in_prevbatch)
             # loop on the items oif dictionary to see which document finshes and which is not
             # if a doc finishes, just remove it and then we will fill random document
-            index_iterator=0
-            deleted_indices=[]
-            added_indices=[]
+
+
             for k, v in prev_items.items():
                 # document has still sentences
                 doc_length = len(self.data_reader_object.dictionary_documents_indices_sentences[k])
@@ -79,7 +81,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
 
 
             # SHOULD REMOVE FROM MEMORY OF HIDDEN LAYERS THE INDEX OF THIS BATCH(Christine)
-
+            #in the transformer fucntion 2-3-2020
             # start of changing index is the size of batch-1 before filling
             if self.indices_to_fill() > 0:
                 # we want to keep track of which indices changed, so from this till the end of the batch
@@ -88,7 +90,10 @@ class BatchTokenLoader(torchtext.data.Iterator):
 
                 random_documents = self.pick_random_documents(range(1, (self.get_documents_size() + 1)),
                                                               self.indices_to_fill())
-                added_indices.append(self.indices_to_fill())
+                index_iterator=len(self.batch)
+                while (index_iterator<self.batch_size):
+                    added_indices.append(index_iterator)
+                    index_iterator=index_iterator+1
                 # print(random_documents)
 
                 # handling case if documents are finished
@@ -98,7 +103,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
             # there is a case that the sentences are less than a batch size but the documents finished
             # make sure documents are finished also
             # batch_size is different..will this make a problem
-            return deleted_indices, added_indices
+        return deleted_indices, added_indices
 
 
     # this should randomize documents, we are getting in the batch
@@ -185,12 +190,18 @@ class BatchTokenLoader(torchtext.data.Iterator):
         while (len(ordered_indices)< len(self.data_reader_object.tokens_list)):
 
             deleted_indices_per_batch, added_indices_per_batch=self.get_batch_next()
+
             added_indices.append(added_indices_per_batch)
             deleted_indices.append(deleted_indices_per_batch)
+            print('length of the batch:    '+str(len(self.batch)))
             if(self.batch_size > len(self.batch)):
                 break
             print(self.documents_in_prevbatch)
             print(self.batch)
+            print('deleted_indices_per_batch:   ')
+            print(deleted_indices_per_batch)
+            print('added_indices_per_batch:   ')
+            print(added_indices_per_batch)
 
             ordered_indices.extend(self.batch)
             print(ordered_indices)

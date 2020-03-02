@@ -72,6 +72,7 @@ def collate(
             'src_tokens': src_tokens,
             'src_lengths': src_lengths,
         },
+
         'target': target,
     }
     if prev_output_tokens is not None:
