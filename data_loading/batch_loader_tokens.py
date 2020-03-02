@@ -59,6 +59,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
             # if a doc finishes, just remove it and then we will fill random document
             index_iterator=0
             deleted_indices=[]
+            added_indices=[]
             for k, v in prev_items.items():
                 # document has still sentences
                 doc_length = len(self.data_reader_object.dictionary_documents_indices_sentences[k])
@@ -87,6 +88,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
 
                 random_documents = self.pick_random_documents(range(1, (self.get_documents_size() + 1)),
                                                               self.indices_to_fill())
+                added_indices.append(self.indices_to_fill())
                 # print(random_documents)
 
                 # handling case if documents are finished
@@ -96,6 +98,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
             # there is a case that the sentences are less than a batch size but the documents finished
             # make sure documents are finished also
             # batch_size is different..will this make a problem
+            return deleted_indices, added_indices
 
 
     # this should randomize documents, we are getting in the batch
@@ -104,6 +107,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
     def pick_random_documents(self, range_shuffle, no_documents_needed):
         # Carlos:  we can subtract total from what we have to get the free ones
         random_documents = []
+        #we can randomize only above certain size to discard the high changes of memory 2-3-2020
         shuffler_index = self.random_shuffler(range_shuffle)
         for i in shuffler_index:
             if (i not in self.total_documents_batched):
@@ -175,9 +179,16 @@ class BatchTokenLoader(torchtext.data.Iterator):
     # this is to prepare the ordered indices for the dataset
     def ordered_indices(self):
         ordered_indices = []
+        deleted_indices=[]
+        added_indices=[]
         # make sure that the condition is right
         while (len(ordered_indices)< len(self.data_reader_object.tokens_list)):
-            self.get_batch_next()
+
+            deleted_indices_per_batch, added_indices_per_batch=self.get_batch_next()
+            added_indices.append(added_indices_per_batch)
+            deleted_indices.append(deleted_indices_per_batch)
+            if(self.batch_size > len(self.batch)):
+                break
             print(self.documents_in_prevbatch)
             print(self.batch)
 

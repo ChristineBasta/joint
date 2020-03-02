@@ -592,6 +592,8 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
 
     def _update_mems(self, hids, mems, qlen, mlen):
         # does not deal with None
+        # I think here we should remove and add indices as suggested (2-3-2020)
+
         if mems is None: return None
 
         # mems is not None

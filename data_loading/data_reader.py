@@ -116,18 +116,23 @@ class DataRawTextReader(FairseqDataset):
     def exists(path):
         return os.path.exists(path)
 
+    def add_src_token (self, line_src):
+        return '<src>'+line_src
+
+    def add_trg_token(self, line_trg):
+        return '<trg>' + line_trg
 
 if __name__ == "__main__":
     #path_src = '/home/christine/Phd/Cristina_cooperation/joint/corpus/train.tags.de-en.en'
     #path_trg = '/home/christine/Phd/Cristina_cooperation/joint/corpus/train.tags.de-en.de'
 
-    path_src = '/home/christine/Phd/Cristina_cooperation/joint/corpus_trial.en'
+    path_src = '../corpus_trial.en'
     # load dictionaries
     # src_dict=
     src_dict = Dictionary.load(
-        '/home/christine/Phd/Cristina_cooperation/joint/data-bin/iwslt14.joined-dictionary.31K.de-en/dict.en.txt')
+        '../data-bin/iwslt14.joined-dictionary.31K.de-en/dict.en.txt')
     trg_dict = Dictionary.load(
-        '/home/christine/Phd/Cristina_cooperation/joint/data-bin/iwslt14.joined-dictionary.31K.de-en/dict.de.txt')
+        '../data-bin/iwslt14.joined-dictionary.31K.de-en/dict.de.txt')
     #tgt_dict = Dictionary.load(os.path.join(args.data[0], 'dict.{}.txt'.format(args.target_lang)))
 
     textReader_src = DataRawTextReader(path_src, src_dict)
