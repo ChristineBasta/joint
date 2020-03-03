@@ -260,3 +260,5 @@ class LanguagePairDataset(FairseqDataset):
 
 
 
+if __name__ == "__main__":
+    dataset= LanguagePairDataset()

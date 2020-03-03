@@ -772,23 +772,22 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
 
         new_mems = self._update_mems(inner_states, mems, mlen, qlen)
 
-        #should I adapt?? Christine 26-2-2020
+        #Christine 3-3-2020, changing all x her in coreout , maybe later we need to work only on target
         if self.normalize:
-            x = self.layer_norm(x)
-
+            core_out = self.layer_norm(core_out)
         # T x B x C -> B x T x C
-        x = x.transpose(0, 1)
+        core_out = core_out.transpose(0, 1)
 
         if self.project_out_dim is not None:
-            x = self.project_out_dim(x)
+            core_out = self.project_out_dim(core_out)
 
         # project back to size of vocabulary
         if self.share_input_output_embed:
-            x = F.linear(x, self.embed_tokens.weight)
+            core_out = F.linear(core_out, self.embed_tokens.weight)
         else:
-            x = F.linear(x, self.embed_out)
+            core_out = F.linear(core_out, self.embed_out)
 
-        pred = x
+        pred = core_out
         info = {'attn': attn, 'inner_states': inner_states}
 
         return pred, info
