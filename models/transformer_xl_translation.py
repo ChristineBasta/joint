@@ -538,19 +538,19 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
         ) if not args.no_token_positional_embeddings else None
         '''
         self.embed_language = LanguageEmbedding(embed_dim) if args.language_embeddings else None
-
-        # will we leave this I guess? (Christine)
+        #Christine 6-3-2020
+        self.n_dec_layers=args.decoder_layers
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        #
         self.layers = nn.ModuleList([])
-        # so the new transformer will replace this (Christine)
-        # how many layers are we going to extend
+
         self.layers.extend([
             #we removed all the parameters , eplace it by args and then in other forward functions, we should take care of this
             #Carlos 25-2-2020
             RelPartialLearnableDecoderLayer(args)
-            for _ in range(args.decoder_layers)
+            for _ in range(self.n_dec_layers)
         ])
-        # will we leave this I guess? (Christine)
-        #this is the layer just for the ouput
+
         self.project_out_dim = Linear(embed_dim, output_embed_dim, bias=False) \
             if embed_dim != output_embed_dim and not args.tie_adaptive_weights else None
 
@@ -560,7 +560,7 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
             nn.init.normal_(self.embed_out, mean=0, std=output_embed_dim ** -0.5)
         self.register_buffer('version', torch.Tensor([2]))
 
-        # will we leave this I guess? because we need this normalization(Christine)
+
         self.normalize = args.decoder_normalize_before and final_norm
         if self.normalize:
             self.layer_norm = LayerNorm(embed_dim)
@@ -578,12 +578,15 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
         self.drop = nn.Dropout(dropout)
         #we change this and later remove
 
-    def init_mems(self):
+    def init_mems(self, dtype):
         if self.mem_len > 0:
             mems = []
-            param = next(self.parameters())
-            for i in range(self.n_layer + 1):
-                empty = torch.empty(0, dtype=param.dtype, device=param.device)
+            #param = next(self.parameters())
+
+
+            for i in range(self.n_dec_layers + 1):
+
+                empty = torch.empty(0, dtype=dtype, device=self.device)
                 mems.append(empty)
 
             return mems
@@ -634,7 +637,8 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
                   tgt_len, src_len)`
         """
         # I think the mems should be initialized and updated in the forward of the jointTransformer
-        if not mems: mems = self.init_mems()
+        #the dtype is updated here Christine 6-3-2020
+        if not mems: mems = self.init_mems(prev_output_tokens.dtype)
         tgt_len = prev_output_tokens.size(1)
         #check to know 26-2-2020
         embedding_dim = prev_output_tokens.size(2)
@@ -651,15 +655,15 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
             if positions is not None:
                 positions = positions[:, -1:]
 
-        # embed tokens and positions
+        # embed tokens
         x = self.embed_scale * self.embed_tokens(prev_output_tokens)
 
         if self.project_in_dim is not None:
             x = self.project_in_dim(x)
 
-        #forget about in our case (Carlos)
-        if positions is not None:
-            x += positions
+
+        #if positions is not None:
+        #    x += positions
 
         # language embedding
         if self.embed_language is not None:
@@ -790,7 +794,7 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
         pred = core_out
         info = {'attn': attn, 'inner_states': inner_states}
 
-        return pred, info
+        return pred, info , new_mems
 
     def max_positions(self):
         """Maximum output length supported by the decoder."""

@@ -1,0 +1,11 @@
+
+
+For data , we shuld get it in the format we are working with, other than this, we will try to make the dictionary in another way:
+1- Tokenize, clean, truecase
+
+2- Add src token to src, target token to target
+
+3-bpe to src and target
+
+4-form the dictionaries
+
