@@ -9,7 +9,7 @@ def add_token(file_to_read, file_to_write, is_src):
         with open(file_to_read) as f:
             for line in f:
                 print(line)
-                if '<title>' not in line and '<speaker>' not in line and '<talkid>' not in line and '<keywords>' not in line and '<url>' not in line:
+                if '< title >' not in line and '< speaker >' not in line and '< talkid >' not in line and '< keywords >' not in line and '< url >' not in line:
                     if is_src:
                         if '\n' in line:
                             file_src.write('<src> '+line)
@@ -21,8 +21,9 @@ def add_token(file_to_read, file_to_write, is_src):
                             file_src.write('<trg> ' + line)
                         else:
                             file_src.write('<trg> ' + line + '\n')
-                elif '<speaker>' not in line and '<talkid>' not in line and '<keywords>' not in line and '<url>' not in line:
+                elif '< speaker >' not in line and '< talkid >' not in line and '< keywords >' not in line and '< url >' not in line:
                     if '\n' in line:
+                        line=line.replace("< title >", "<title>")
                         file_src.write(line)
                     else:
                         file_src.write(line+'\n')
@@ -31,4 +32,4 @@ def add_token(file_to_read, file_to_write, is_src):
 
 
 
-add_token('../data-bin/Europarl/train.tags.de-en.en', '../data-bin/Europarl/train.tags.de-en.tokened.en', True)
+add_token('../data-bin/Europarl/train.tags.de-en.tok.tc.clean.en', '../data-bin/Europarl/train.tags.de-en.tok.tc.clean.tagged.en', True)

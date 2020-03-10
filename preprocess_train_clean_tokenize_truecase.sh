@@ -10,7 +10,7 @@ BPEROOT=subword-nmt
 BPE_TOKENS=31000
 
 #####load the scripts to call later easier######
-#. $SCRIPTS/generic.sh
+. $SCRIPTS/generic.sh
 
 src=en
 tgt=de
@@ -34,7 +34,7 @@ for LANG in $src $tgt
 do
   log "Processing training [$LANG] data..."
   tokenize $LANG < $PREFIX.$LANG > $PREFIX.tok.$LANG
-  rm $PREFIX.$LANG
+  #rm $PREFIX.$LANG   #not to remove the original now
   train_truecaser $PREFIX.tok.$LANG $OUTPUT_DIR/truecasing.$LANG
   truecase $OUTPUT_DIR/truecasing.$LANG < $PREFIX.tok.$LANG > $PREFIX.tok.tc.$LANG
   rm $PREFIX.tok.$LANG
