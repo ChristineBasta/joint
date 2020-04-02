@@ -114,7 +114,7 @@ def load_langpair_dataset(data_path, split,
     #check if the file exists, nothing more
     def split_exists(split, src, tgt, lang, data_path):
         filename = os.path.join(data_path, '{}.{}-{}.{}'.format(split, src, tgt, lang))
-        return indexed_dataset.dataset_exists(filename, impl=dataset_impl)
+        return os.path.exists(data_path)
 
     src_datasets = []
 
@@ -122,43 +122,48 @@ def load_langpair_dataset(data_path, split,
 
     #to get the file prefix for each split, train, valid or test
     #check thus
-    for k in itertools.count():
-        split_k = split + (str(k) if k > 0 else '')
+    print(itertools.count())
+    #some comments for intertools
+    #for k in itertools.count():
+    k=0
+    split_k = split + (str(k) if k > 0 else '')
 
-        # infer langcode
-        if split_exists(split_k, src, tgt, src, data_path):
-            prefix = os.path.join(data_path, '{}.{}-{}.'.format(split_k, src, tgt))
-        elif split_exists(split_k, tgt, src, src, data_path):
-            prefix = os.path.join(data_path, '{}.{}-{}.'.format(split_k, tgt, src))
-        else:
-            if k > 0:
-                break
-            else:
-                raise FileNotFoundError('Dataset not found: {} ({})'.format(split, data_path))
-
-        textReader_src = DataRawTextReader(prefix + src, src_dict)
-        src_dataset_tokens= textReader_src.dictionary_tokens_of_sentences
-        src_dataset_sentences= textReader_src.dictionary_sentences
-
-        textReader_trg = DataRawTextReader(prefix + tgt, tgt_dict)
-        trg_dataset_tokens = textReader_trg.dictionary_tokens_of_sentences
-        trg_dataset_tokens = textReader_trg.dictionary_sentences
-
-
-        #our datasets should be uplaoded here
-        src_datasets.append(textReader_src)
-        tgt_datasets.append(textReader_trg)
-
-        print('| {} {} {}-{} {} examples'.format(data_path, split_k, src, tgt, len(src_datasets[-1])))
-
-        if not combine:
+    # infer langcode
+    if split_exists(split_k, src, tgt, src, data_path):
+        prefix = os.path.join(data_path, '{}.{}-{}.'.format(split_k, src, tgt))
+    elif split_exists(split_k, tgt, src, src, data_path):
+        prefix = os.path.join(data_path, '{}.{}-{}.'.format(split_k, tgt, src))
+    '''
+    else:
+        if k > 0:
             break
+        else:
+            raise FileNotFoundError('Dataset not found: {} ({})'.format(split, data_path))
+    '''
+    textReader_src = DataRawTextReader(prefix + src, src_dict)
+    src_dataset_tokens= textReader_src.dictionary_tokens_of_sentences
+    src_dataset_sentences= textReader_src.dictionary_sentences
 
+    textReader_trg = DataRawTextReader(prefix + tgt, tgt_dict)
+    trg_dataset_tokens = textReader_trg.dictionary_tokens_of_sentences
+    trg_dataset_tokens = textReader_trg.dictionary_sentences
+
+
+    #our datasets should be uplaoded here
+    src_datasets.append(textReader_src)
+    tgt_datasets.append(textReader_trg)
+
+    print('| {} {} {}-{} {} examples'.format(data_path, split_k, src, tgt, len(src_datasets[-1])))
+    '''
+    if not combine:
+        break
+    '''
     assert len(src_datasets) == len(tgt_datasets)
 
     #not sure about this part (Christine)
     if len(src_datasets) == 1:
         src_dataset, tgt_dataset = src_datasets[0], tgt_datasets[0]
+    '''   
     else:
         #should I have to comment this? (Christine)
         #related to use more than one siurce of data
@@ -166,7 +171,7 @@ def load_langpair_dataset(data_path, split,
         sample_ratios[0] = upsample_primary
         src_dataset = ConcatDataset(src_datasets, sample_ratios)
         tgt_dataset = ConcatDataset(tgt_datasets, sample_ratios)
-
+    '''
     return LanguagePairDataset(
         src_dataset, src_dataset.sizes, src_dict,
         tgt_dataset, tgt_dataset.sizes, tgt_dict,

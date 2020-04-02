@@ -47,7 +47,7 @@ for L in $src $tgt; do
         echo "apply_bpe.py to ${f}..."
 
 
-        python $BPEROOT/apply_bpe.py -c $BPE_CODE < $INPUT_DIR/$f > $OUTPUT_DIR/$f
+        python $BPEROOT/apply_bpe.py -c $BPE_CODE < $INPUT_DIR/$f > $INPUT_DIR/$f.bpe
     done
 done
 

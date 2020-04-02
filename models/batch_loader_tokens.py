@@ -167,15 +167,15 @@ class BatchTokenLoader(torchtext.data.Iterator):
         for index_random_document in random_documents:
             # add the index of dictionary
             self.sentence_count += 1
+            if(len(self.data_reader_object.dictionary_documents_indices_sentences[index_random_document])>0):
+                self.batch.append(self.data_reader_object.dictionary_documents_indices_sentences[index_random_document][0])
 
-            self.batch.append(self.data_reader_object.dictionary_documents_indices_sentences[index_random_document][0])
-
-            # should be ordered like the order of the batch
-            #self.documents_in_prevbatch[index_random_document] = self.data_reader_object.dictionary_documents_indices_sentences[index_random_document][0]
-            self.documents_in_prevbatch[index_random_document] = \
-            self.data_reader_object.dictionary_documents_indices_sentences[index_random_document][0]
-            self.total_documents_batched.append(index_random_document)
-            self.sentence_count += 1
+                # should be ordered like the order of the batch
+                #self.documents_in_prevbatch[index_random_document] = self.data_reader_object.dictionary_documents_indices_sentences[index_random_document][0]
+                self.documents_in_prevbatch[index_random_document] = \
+                self.data_reader_object.dictionary_documents_indices_sentences[index_random_document][0]
+                self.total_documents_batched.append(index_random_document)
+                self.sentence_count += 1
 
             # check if we reached batch size
             if (len(self.batch) > self.batch_size):
@@ -196,15 +196,15 @@ class BatchTokenLoader(torchtext.data.Iterator):
             print('length of the batch:    '+str(len(self.batch)))
             if(self.batch_size > len(self.batch)):
                 break
-            print(self.documents_in_prevbatch)
-            print(self.batch)
-            print('deleted_indices_per_batch:   ')
-            print(deleted_indices_per_batch)
-            print('added_indices_per_batch:   ')
-            print(added_indices_per_batch)
+            #print(self.documents_in_prevbatch)
+            #print(self.batch)
+            #print('deleted_indices_per_batch:   ')
+            #print(deleted_indices_per_batch)
+            #print('added_indices_per_batch:   ')
+            #print(added_indices_per_batch)
 
             ordered_indices.extend(self.batch)
-            print(ordered_indices)
+            #print(ordered_indices)
         return ordered_indices
 
     # different indices to fill

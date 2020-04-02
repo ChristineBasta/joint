@@ -18,7 +18,7 @@ from fairseq.models import (
     FairseqIncrementalDecoder, FairseqEncoder, FairseqModel, register_model, register_model_architecture
 )
 
-from .protected_multihead_attention import ProtectedMultiheadAttention
+from .protected_multihead_attention_edited import ProtectedMultiheadAttention
 
 
 class PositionalEmbedding(nn.Module):

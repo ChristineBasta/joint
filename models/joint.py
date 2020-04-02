@@ -20,21 +20,17 @@ from fairseq.models import (
 
 from .protected_multihead_attention import ProtectedMultiheadAttention
 
-
 @register_model('joint_attention')
 class JointAttentionModel(FairseqModel):
     """
     Local Joint Source-Target model from
     `"Joint Source-Target Self Attention with Locality Constraints" (Fonollosa, et al, 2019)
     <https://>`_.
-
     Args:
         encoder (JointAttentionEncoder): the encoder
         decoder (JointAttentionDecoder): the decoder
-
     The joint source-target model provides the following named architectures and
     command-line arguments:
-
     .. argparse::
         :ref: fairseq.models.joint_attention_parser
         :prog:
@@ -43,7 +39,6 @@ class JointAttentionModel(FairseqModel):
     def __init__(self, encoder, decoder):
         super().__init__(encoder, decoder)
         # control the memories, but u need top overwrite the forward of fairmodel (Carlos)
-
     @staticmethod
     def add_args(parser):
         """Add model-specific arguments to the parser."""
@@ -82,14 +77,6 @@ class JointAttentionModel(FairseqModel):
                             help='list of kernel size (default: None)')
         parser.add_argument('--language-embeddings', action='store_true',
                             help='use language embeddings')
-        # for the transformer XL integration, still I believe the numbers can not really adapt
-        # Christine (7-2-2020)
-        parser.add_argument('--d_head', type=int, default=50,
-                            help='head dimension')
-        parser.add_argument('--d_inner', type=int, default=1000,
-                            help='inner dimension in FF')
-        parser.add_argument('--pre_lnorm', action='store_true',
-                            help='apply LayerNorm to the input instead of the output')
 
     @classmethod
     def build_model(cls, args, task):
@@ -149,7 +136,6 @@ class JointAttentionModel(FairseqModel):
 class JointAttentionEncoder(FairseqEncoder):
     """
     JointAttention encoder is used only to compute the source embeddings.
-
     Args:
         args (argparse.Namespace): parsed command-line arguments
         dictionary (~fairseq.data.Dictionary): encoding dictionary
@@ -168,13 +154,10 @@ class JointAttentionEncoder(FairseqEncoder):
         self.embed_tokens = embed_tokens
         self.embed_scale = math.sqrt(embed_dim)
         # in our case, should be replaced by the other embeddings(Christine)
-        #(Christine)(7 - 2 - 2020)
-        '''
         self.embed_positions = PositionalEmbedding(
             args.max_source_positions, embed_dim, self.padding_idx,
             learned=args.encoder_learned_pos,
         ) if not args.no_token_positional_embeddings else None
-        '''
         self.embed_language = LanguageEmbedding(embed_dim) if args.language_embeddings else None
 
         self.register_buffer('version', torch.Tensor([2]))
@@ -186,7 +169,6 @@ class JointAttentionEncoder(FairseqEncoder):
                 `(batch, src_len)`
             src_lengths (torch.LongTensor): lengths of each source sentence of
                 shape `(batch)`
-
         Returns:
             dict:
                 - **encoder_out** (Tensor): embedding output of shape
@@ -197,9 +179,9 @@ class JointAttentionEncoder(FairseqEncoder):
         # embed tokens and positions
         x = self.embed_scale * self.embed_tokens(src_tokens)
 
-        # changed for transformerXL (Christine)(7-2-2020)
-        #if self.embed_positions is not None:
-        #    x += self.embed_positions(src_tokens)
+        # this should be edited by transformerXL (Christine)
+        if self.embed_positions is not None:
+            x += self.embed_positions(src_tokens)
 
         # language embedding
         if self.embed_language is not None:
@@ -208,8 +190,8 @@ class JointAttentionEncoder(FairseqEncoder):
         x = F.dropout(x, p=self.dropout, training=self.training)
 
         # B x T x C -> T x B x C
-        # ????? (Christine)
-        # why???
+        #????? (Christine)
+        #why???
         x = x.transpose(0, 1)
 
         # compute padding mask
@@ -225,11 +207,9 @@ class JointAttentionEncoder(FairseqEncoder):
     def reorder_encoder_out(self, encoder_out, new_order):
         """
         Reorder encoder output according to *new_order*.
-
         Args:
             encoder_out: output from the ``forward()`` method
             new_order (LongTensor): desired order
-
         Returns:
             *encoder_out* rearranged according to *new_order*
         """
@@ -241,21 +221,17 @@ class JointAttentionEncoder(FairseqEncoder):
                 encoder_out['encoder_padding_mask'].index_select(0, new_order)
         return encoder_out
 
-    # Christine (10-2-2019)
-    # because we do not have embed_positions any more
-    '''
     def max_positions(self):
         """Maximum input length supported by the encoder."""
         if self.embed_positions is None:
             return self.max_source_positions
         return min(self.max_source_positions, self.embed_positions.max_positions())
-    '''
+
 
 class JointAttentionDecoder(FairseqIncrementalDecoder):
     """
     JointAttention decoder consisting of *args.decoder_layers* layers. Each layer
     is a :class:`ProtectedTransformerDecoderLayer`.
-
     Args:
         args (argparse.Namespace): parsed command-line arguments
         dictionary (~fairseq.data.Dictionary): decoding dictionary
@@ -282,13 +258,13 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
 
         # if the input embed dim coming from encoder is (Christine)
         self.project_in_dim = Linear(input_embed_dim, embed_dim, bias=False) if embed_dim != input_embed_dim else None
-        #changed for the transformer (Christine)(7-2-2020)
-        '''
+        # this should be edited (Christine)
+        #by the new ones
         self.embed_positions = PositionalEmbedding(
             args.max_target_positions, embed_dim, padding_idx,
             learned=args.decoder_learned_pos,
         ) if not args.no_token_positional_embeddings else None
-        '''
+
         self.embed_language = LanguageEmbedding(embed_dim) if args.language_embeddings else None
 
         # will we leave this I guess? (Christine)
@@ -300,11 +276,11 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
             for _ in range(args.decoder_layers)
         ])
         # will we leave this I guess? (Christine)
-        # this is the layer just for the ouput
+        #this is the layer just for the ouput
         self.project_out_dim = Linear(embed_dim, output_embed_dim, bias=False) \
             if embed_dim != output_embed_dim and not args.tie_adaptive_weights else None
 
-        # ???? (Christine)
+        #???? (Christine)
         if not self.share_input_output_embed:
             self.embed_out = nn.Parameter(torch.Tensor(len(dictionary), output_embed_dim))
             nn.init.normal_(self.embed_out, mean=0, std=output_embed_dim ** -0.5)
@@ -315,7 +291,7 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
         if self.normalize:
             self.layer_norm = LayerNorm(embed_dim)
 
-    def forward(self, prev_output_tokens, encoder_out,  mems=None, incremental_state=None):
+    def forward(self, prev_output_tokens, encoder_out, incremental_state=None):
         """
         Args:
             input (dict): with
@@ -325,7 +301,6 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
                 encoder-side attention
             incremental_state (dict): dictionary used for storing state during
                 :ref:`Incremental decoding`
-
         Returns:
             tuple:
                 - the last decoder layer's output of shape `(batch, tgt_len,
@@ -336,20 +311,17 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
         tgt_len = prev_output_tokens.size(1)
 
         # embed positions
-        ## should be commented for the transformer XL Christine(7-2-2020)
-        '''
+        ## will be edited with the new positional embeddings ? (Christine)
         positions = self.embed_positions(
             prev_output_tokens,
             incremental_state=incremental_state,
         ) if self.embed_positions is not None else None
-        '''
 
         # what is incremental state? (Christine)
         if incremental_state is not None:
             prev_output_tokens = prev_output_tokens[:, -1:]
-            ## should be commented for the transformer XL Christine(7-2-2020)
-            #if positions is not None:
-            #    positions = positions[:, -1:]
+            if positions is not None:
+                positions = positions[:, -1:]
 
         # embed tokens and positions
         x = self.embed_scale * self.embed_tokens(prev_output_tokens)
@@ -357,9 +329,9 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
         if self.project_in_dim is not None:
             x = self.project_in_dim(x)
 
-        ## should be commented for the transformer XL Christine(7-2-2020)
-        #if positions is not None:
-        #    x += positions
+        #forget about in our case (Carlos)
+        if positions is not None:
+            x += positions
 
         # language embedding
         if self.embed_language is not None:
@@ -372,7 +344,7 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
 
         x = x.transpose(0, 1)
         attn = None
-        # hidden?
+        #hidden?
         inner_states = [x]
         source = encoder_out['encoder_out']
         process_source = incremental_state is None or len(incremental_state) == 0
@@ -387,9 +359,8 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
             self_attn_padding_mask = None
 
         # transformer layers
-        # why are these target masking
-        # I think these layers should change
-        #should change them too to be able to forward right to the protected multi attention (Christine 11-2-2020)
+        #why are these target masking
+        #I think these layers should change
         for i, layer in enumerate(self.layers):
 
             if self.kernel_size_list is not None:
@@ -427,7 +398,6 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
                 x,
                 None,
                 None,
-
                 state,
                 self_attn_mask=self_attn_mask,
                 self_attn_padding_mask=self_attn_padding_mask
@@ -454,19 +424,16 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
 
         return pred, info
 
-    #Christine (10-2-2019)
-    #because we do not have embed_positions any more
-    '''
     def max_positions(self):
         """Maximum output length supported by the decoder."""
         if self.embed_positions is None:
             return self.max_target_positions
         return min(self.max_target_positions, self.embed_positions.max_positions())
-    '''
+
     def buffered_future_mask(self, tensor):
         """Cached future mask."""
         dim = tensor.size(0)
-        # pylint: disable=access-member-before-definition, attribute-defined-outside-init
+        #pylint: disable=access-member-before-definition, attribute-defined-outside-init
         if not hasattr(self, '_future_mask') or self._future_mask is None or self._future_mask.device != tensor.device:
             self._future_mask = torch.triu(utils.fill_with_neg_inf(tensor.new(dim, dim)), 1)
         if self._future_mask.size(0) < dim:
@@ -492,75 +459,10 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
 
         return mask1 + mask2
 
-class PositionalEmbedding(nn.Module):
-    def __init__(self, demb):
-        super(PositionalEmbedding, self).__init__()
 
-        self.demb = demb
-
-        # ???(Christine)
-        inv_freq = 1 / (10000 ** (torch.arange(0.0, demb, 2.0) / demb))
-        self.register_buffer('inv_freq', inv_freq)
-
-    def forward(self, pos_seq, bsz=None):
-        # outer product of pos_seq and inv_freq
-        sinusoid_inp = torch.ger(pos_seq, self.inv_freq)
-
-        # compute relative positional embedding
-        pos_emb = torch.cat([sinusoid_inp.sin(), sinusoid_inp.cos()], dim=-1)
-
-        if bsz is not None:
-            # first -1 means the size does not change
-            return pos_emb[:, None, :].expand(-1, bsz, -1)
-        else:
-            return pos_emb[:, None, :]
-
-
-class PositionwiseFF(nn.Module):
-    def __init__(self, d_model, d_inner, dropout, pre_lnorm=False):
-        super(PositionwiseFF, self).__init__()
-
-        self.d_model = d_model
-        self.d_inner = d_inner
-        self.dropout = dropout
-
-        # feed forward layer
-        self.CoreNet = nn.Sequential(
-            nn.Linear(d_model, d_inner), nn.ReLU(inplace=True),
-            nn.Dropout(dropout),
-            nn.Linear(d_inner, d_model),
-            nn.Dropout(dropout),
-        )
-        # layer normalization
-        self.layer_norm = nn.LayerNorm(d_model)
-
-        self.pre_lnorm = pre_lnorm
-
-    def forward(self, inp):
-        if self.pre_lnorm:
-            ##### layer normalization + positionwise feed-forward
-            core_out = self.CoreNet(self.layer_norm(inp))
-
-            ##### residual connection
-            output = core_out + inp
-        else:
-            ##### positionwise feed-forward
-            core_out = self.CoreNet(inp)
-
-            ##### residual connection + layer normalization
-            output = self.layer_norm(inp + core_out)
-
-        return output
-
-    def _create_params(self):
-        if self.attn_type == 0:  # default attention
-            self.pos_emb = PositionalEmbedding(self.d_model)
-            self.r_w_bias = nn.Parameter(torch.Tensor(self.n_head, self.d_head))
-            self.r_r_bias = nn.Parameter(torch.Tensor(self.n_head, self.d_head))
 # Adapted from fairseq/model/transformer.py to use ProtectedMultiheadAttention
 class ProtectedTransformerDecoderLayer(nn.Module):
     """Decoder layer block.
-
     In the original paper each operation (multi-head attention, encoder
     attention or FFN) is postprocessed with: `dropout -> add residual ->
     layernorm`. In the tensor2tensor code they suggest that learning is more
@@ -568,7 +470,6 @@ class ProtectedTransformerDecoderLayer(nn.Module):
     `dropout -> add residual`. We default to the approach in the paper, but the
     tensor2tensor approach can be enabled by setting
     *args.decoder_normalize_before* to ``True``.
-
     Args:
         args (argparse.Namespace): parsed command-line arguments
         no_encoder_attn (bool, optional): whether to attend to encoder outputs
@@ -578,15 +479,10 @@ class ProtectedTransformerDecoderLayer(nn.Module):
     def __init__(self, args, no_encoder_attn=False):
         super().__init__()
         self.embed_dim = args.decoder_embed_dim
-        self.n_heads =  args.decoder_attention_heads
-        self.d_heads =  args.d_head
-        # Christine (5-2-2020), changed for transformer XL
         self.self_attn = ProtectedMultiheadAttention(
-            self.n_heads, self.embed_dim, self.d_heads,
-            dropout=args.attention_dropout
-
+            self.embed_dim, args.decoder_attention_heads,
+            dropout=args.attention_dropout,
         )
-        #
         self.dropout = args.dropout
         self.relu_dropout = args.relu_dropout
         self.normalize_before = args.decoder_normalize_before
@@ -598,11 +494,9 @@ class ProtectedTransformerDecoderLayer(nn.Module):
             self.encoder_attn_layer_norm = None
         else:
             # we can encapsulate the  transformer xl attention here and leave th rest as it is (Carlos)
-            # Christine (5-2-2020), changed for transformer XL
             self.encoder_attn = ProtectedMultiheadAttention(
-                args.decoder_attention_heads, self.embed_dim, args.d_head,
-                dropout=args.attention_dropout
-
+                self.embed_dim, args.decoder_attention_heads,
+                dropout=args.attention_dropout,
             )
             self.encoder_attn_layer_norm = LayerNorm(self.embed_dim)
 
@@ -611,23 +505,13 @@ class ProtectedTransformerDecoderLayer(nn.Module):
 
         self.final_layer_norm = LayerNorm(self.embed_dim)
         self.need_attn = True
-        # Christine (5-2-2020), changed for transformer ..should be put here
-        #for relative positional
-        #after talking with Carlos, not sure that pos_ff is important
-        #self.pos_ff = PositionwiseFF(self.embed_dim, args.d_inner, self.dropout ,pre_lnorm=args.pre_lnorm)
+
         self.onnx_trace = False
-        self.pos_emb = PositionalEmbedding(self.embed_dim)
-        self.r_w_bias = nn.Parameter(torch.Tensor(self.n_heads, self.d_heads))
-        self.r_r_bias = nn.Parameter(torch.Tensor(self.n_heads, self.d_heads))
+
     def prepare_for_onnx_export_(self):
         self.onnx_trace = True
 
-
-
-
-
-
-    def forward(self, x, encoder_out, encoder_padding_mask, incremental_state,  mems=None,
+    def forward(self, x, encoder_out, encoder_padding_mask, incremental_state,
                 prev_self_attn_state=None, prev_attn_state=None, self_attn_mask=None,
                 self_attn_padding_mask=None):
         """
@@ -635,31 +519,12 @@ class ProtectedTransformerDecoderLayer(nn.Module):
             x (Tensor): input to the layer of shape `(seq_len, batch, embed_dim)`
             encoder_padding_mask (ByteTensor): binary ByteTensor of shape
                 `(batch, src_len)` where padding elements are indicated by ``1``.
-
         Returns:
             encoded output of shape `(batch, src_len, embed_dim)`
         """
-        #ghalban hna han7tag n7ot elwasla bin elpositiuoal welattention elgdid
-
-        #Christine (11-2-2020)
-        #this should be adapted for the new positional embeddings
-        #not sure ..it should be adapted here or not
-
-        qlen,bsz, emb_size= x.size()
-        mlen = mems[0].size(0) if mems is not None else 0
-        # the length of the current batch
-        klen = mlen + qlen
-        # Christine (12-2-2020)...remember to change the device and type ...for now I am removing them
-        pos_seq = torch.arange(klen - 1, -1, -1.0)
-        # Christine (12-2-2020)...remember to add this when it seems importat later
-        #if self.clamp_len > 0:
-        #    pos_seq.clamp_(max=self.clamp_len)
-        # pos_emb is the positional embedding of the sequence, R in the paper
-        pos_emb = self.pos_emb(pos_seq)
-
-
-
         residual = x
+        print('size of input:')
+        print(x.size())
         x = self.maybe_layer_norm(self.self_attn_layer_norm, x, before=True)
         if prev_self_attn_state is not None:
             if incremental_state is None:
@@ -671,11 +536,6 @@ class ProtectedTransformerDecoderLayer(nn.Module):
             query=x,
             key=x,
             value=x,
-            #here we should add the r and the biasesChristine (5-2-2020)
-            #need editing(7-2-2020)
-            r=pos_emb,
-            r_w_bias=self.r_w_bias,
-            r_r_bias=self.r_r_bias,
             key_padding_mask=self_attn_padding_mask,
             incremental_state=incremental_state,
             need_weights=False,
@@ -699,10 +559,6 @@ class ProtectedTransformerDecoderLayer(nn.Module):
                 query=x,
                 key=encoder_out,
                 value=encoder_out,
-                # need editing(7-2-2020)
-                r=pos_emb,
-                r_w_bias=self.r_w_bias,
-                r_r_bias=self.r_r_bias,
                 key_padding_mask=encoder_padding_mask,
                 incremental_state=incremental_state,
                 static_kv=True,
@@ -711,7 +567,6 @@ class ProtectedTransformerDecoderLayer(nn.Module):
             x = F.dropout(x, p=self.dropout, training=self.training)
             x = residual + x
             x = self.maybe_layer_norm(self.encoder_attn_layer_norm, x, after=True)
-        #Christine (5-2-2020)ghalban hna  at some point elx yt7at aliha elrelative positional
 
         residual = x
         x = self.maybe_layer_norm(self.final_layer_norm, x, before=True)
@@ -725,10 +580,6 @@ class ProtectedTransformerDecoderLayer(nn.Module):
             saved_state = self.self_attn._get_input_buffer(incremental_state)
             self_attn_state = saved_state["prev_key"], saved_state["prev_value"]
             return x, attn, self_attn_state
-
-
-        #Christine (5-2-2020) lazm hna at some point elx yt7at aliha elrelative positional
-        #ta2riban abl elresidual bas ana msh mot2kda
         return x, attn
 
     def maybe_layer_norm(self, layer_norm, x, before=False, after=False):
@@ -792,16 +643,8 @@ def base_architecture(args):
     args.share_all_embeddings = getattr(args, 'share_all_embeddings', False)
     args.no_token_positional_embeddings = getattr(args, 'no_token_positional_embeddings', False)
     args.kernel_size_list = getattr(args, 'kernel_size_list', None)
-    assert args.kernel_size_list is None or len(
-        args.kernel_size_list) == args.decoder_layers, "kernel_size_list doesn't match decoder_layers"
+    assert args.kernel_size_list is None or len(args.kernel_size_list) == args.decoder_layers, "kernel_size_list doesn't match decoder_layers"
     args.language_embeddings = getattr(args, 'language_embeddings', True)
-    # Christine (5-2-2020), changed for transformer XL
-    # maybe we can add it in another way...these numbers are not compatible with the transformer xl
-    #they are taken from transformer as they are
-    args.d_head = getattr(args, 'd_head', 50)
-    args.d_inner= getattr(args, 'd_inner', 1000)
-    args.pre_lnorm = getattr(args, 'pre_lnorm', False)
-
 
 
 @register_model_architecture('joint_attention', 'joint_attention_iwslt_de_en')
@@ -817,7 +660,13 @@ def joint_attention_iwslt_de_en(args):
 
 @register_model_architecture('joint_attention', 'local_joint_attention_iwslt_de_en')
 def local_joint_attention_iwslt_de_en(args):
-    args.kernel_size_list = getattr(args, 'kernel_size_list', [3, 5, 7, 9, 11, 13, 15, 17, 21, 25, 29, 33, 37, 41])
+    args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 32)
+    args.decoder_embed_dim = getattr(args, 'decoder_embed_dim', 32)
+    args.decoder_ffn_embed_dim = getattr(args, 'decoder_ffn_embed_dim', 32)
+    args.decoder_attention_heads = getattr(args, 'decoder_attention_heads', 2)
+    args.decoder_layers = getattr(args, 'decoder_layers', 4)
+    #args.kernel_size_list = getattr(args, 'kernel_size_list', [3, 5, 7, 9, 11, 13, 15, 17, 21, 25, 29, 33, 37, 41])
+    args.kernel_size_list = getattr(args, 'kernel_size_list', [3, 5, 7, 9])
     joint_attention_iwslt_de_en(args)
 
 

@@ -26,7 +26,7 @@ PREFIX=$INPUT_DIR/train.tags.de-en
 
 
 #############take care of the inputs formats ########################################
-####we just need the train files to be train.en and train.es for example######
+####we just need the train files to be valid.en-de.en and train.es for example######
 ####we just need the train files to be test_.en and test_.es for example######
 ############## tokenize, truecase, clean##############################################
 echo  $PREFIX.$LANG
