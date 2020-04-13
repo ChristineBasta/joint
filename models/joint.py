@@ -660,13 +660,7 @@ def joint_attention_iwslt_de_en(args):
 
 @register_model_architecture('joint_attention', 'local_joint_attention_iwslt_de_en')
 def local_joint_attention_iwslt_de_en(args):
-    args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 32)
-    args.decoder_embed_dim = getattr(args, 'decoder_embed_dim', 32)
-    args.decoder_ffn_embed_dim = getattr(args, 'decoder_ffn_embed_dim', 32)
-    args.decoder_attention_heads = getattr(args, 'decoder_attention_heads', 2)
-    args.decoder_layers = getattr(args, 'decoder_layers', 4)
-    #args.kernel_size_list = getattr(args, 'kernel_size_list', [3, 5, 7, 9, 11, 13, 15, 17, 21, 25, 29, 33, 37, 41])
-    args.kernel_size_list = getattr(args, 'kernel_size_list', [3, 5, 7, 9])
+    args.kernel_size_list = getattr(args, 'kernel_size_list', [3, 5, 7, 9, 11, 13, 15, 17, 21, 25, 29, 33, 37, 41])
     joint_attention_iwslt_de_en(args)
 
 
@@ -702,3 +696,10 @@ def joint_attention_wmt_en_fr_big(args):
 def local_joint_attention_wmt_en_fr_big(args):
     args.kernel_size_list = getattr(args, 'kernel_size_list', [7, 15, 31, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63])
     joint_attention_wmt_en_fr_big(args)
+
+
+
+
+
+
+

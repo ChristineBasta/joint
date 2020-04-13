@@ -6,12 +6,10 @@ SCRIPTS=mosesdecoder/scripts
 TOKENIZER=$SCRIPTS/tokenizer/tokenizer.perl
 LC=$SCRIPTS/tokenizer/lowercase.perl
 CLEAN=$SCRIPTS/training/clean-corpus-n.perl
-BPEROOT=subword-nmt
-BPE_TOKENS=31000
 
 #####load the scripts to call later easier######
 . $SCRIPTS/generic.sh
-
+# Process each file
 src=en
 tgt=de
 lang=en-de
@@ -20,7 +18,6 @@ OUTPUT_DIR=data-bin/Europarl/output
 tmp=$OUTPUT_DIR
 
 mkdir $OUTPUT_DIR
-# Process each file
 PREFIX=$INPUT_DIR/train.tags.de-en
 
 
@@ -46,11 +43,7 @@ log "Cleaning corpus..."
 clean_corpus $PREFIX.tok.tc $src $tgt clean
 rm $PREFIX.tok.tc.{$src,$trg}
 
-log "*** Training data is prepared at $PREFIX.tok.tc.clean.{en,de}"
-
-
-
-
+log "*** Training data is prepared at $PREFIX.tok.tc.clean.{$src,$tgt}"
 
 
 

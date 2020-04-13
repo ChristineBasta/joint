@@ -1,11 +1,18 @@
 
 
-For data , we shuld get it in the format we are working with, other than this, we will try to make the dictionary in another way:
-1- Tokenize, clean, truecase
+For data , we should get it in the format we are working with, other than this, we will try to make the dictionary in another way:
+1- Tokenize,  truecase
 
 2- Add src token to src, target token to target
-
-3-bpe to src and target
-
+4- clean after the tagging as sometimes title and description tags are swapped
+5-bpe to src and target
+prepare the valid and test
 4-form the dictionaries
+
+notes:
+sometimes the lines are empty in the src and tgr files and these lines are not written in the prepared files and thus deteriorates the paralel language files
+
+if any of the files do not have tab title at the end, please add
+<title> last title</title>
+
 
