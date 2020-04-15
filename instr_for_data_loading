@@ -1,5 +1,6 @@
 
-
+include generic.sh in scripts
+include input-from-sgm-documents.perl to add the titles
 For data , we should get it in the format we are working with, other than this, we will try to make the dictionary in another way:
 1- Tokenize,  truecase
 

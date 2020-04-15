@@ -16,6 +16,8 @@ fairseq-train data-bin/iwslt14.joined-dictionary.31K.de-en \
     --arch local_joint_attention_iwslt_de_en --share-all-embeddings \
     --save-dir $SAVE
 
+
+
 python scripts/average_checkpoints.py --inputs $SAVE \
     --num-epoch-checkpoints 10 --output "${SAVE}/checkpoint_last10_avg.pt"
 
