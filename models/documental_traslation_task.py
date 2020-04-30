@@ -24,13 +24,16 @@ import fairseq.data.iterators as iterators
 
 
 #max_Sentences only...because in our case the max tokens will be commented all the way to make sure thatw
-def _is_batch_full( batch,  max_sentences):
+def _is_batch_full( batch,  max_sentences, batch_mult_size):
     if len(batch) == 0:
         return 0
     if max_sentences > 0 and len(batch) == max_sentences:
         return 1
     #if max_tokens > 0 and num_tokens > max_tokens:
     #    return 1
+    if (len(batch)%batch_mult_size)==0:     #added condition to solve the batching, is
+        # this corect or should I speciify max_Sentences equal to the batch_size (30-4-2020)
+        return 1
     return 0
 
 #taken from data_utils
@@ -55,17 +58,17 @@ def batch_by_size(
             be a multiple of N (default: 1).
     """
 
-    max_tokens = max_tokens if max_tokens is not None else -1
+    #max_tokens = max_tokens if max_tokens is not None else -1
     max_sentences = max_sentences if max_sentences is not None else -1
     bsz_mult = required_batch_size_multiple
 
     if isinstance(indices, types.GeneratorType):
         indices = np.fromiter(indices, dtype=np.int64, count=-1)
 
-    return batch_by_size_fast(indices, max_sentences)
+    return batch_by_size_fast(indices, max_sentences,bsz_mult)
 
 #remove all related to number of tokens and sample length as we donot need them
-def batch_by_size_fast(indices, max_sentences):
+def batch_by_size_fast(indices, max_sentences,bsz_mult):
 
     batch = []
     batches = []
@@ -87,16 +90,17 @@ def batch_by_size_fast(indices, max_sentences):
         #)
         #num_tokens = (len(batch) + 1) * sample_len
 
-        if _is_batch_full(batch, max_sentences):
-            #mod_len = max(
-            #    bsz_mult * (len(batch) // bsz_mult),
-            #    len(batch) % bsz_mult,
-            #)
-            batch_size=max_sentences
-            #batches.append(batch[:mod_len])
-            #batch = batch[mod_len:]
-            batches.append(batch[:batch_size])
-            batch = batch[batch_size:]
+        if _is_batch_full(batch, max_sentences, bsz_mult):
+            mod_len = max(
+                bsz_mult * (len(batch) // bsz_mult),
+                len(batch) % bsz_mult,
+            )
+            #batch_size=max_sentences
+            batches.append(batch[:mod_len])
+            batch = batch[mod_len:]
+            #batches.append(batch[:batch_size])
+            #batch = batch[batch_size:]
+            #sample se
             #sample_lens = sample_lens[mod_len:]
             #sample_len = max(sample_lens) if len(sample_lens) > 0 else 0
         batch.append(idx)
@@ -371,7 +375,7 @@ class TranslationTransformerTask(FairseqTask):
         # it just adjusts the batch by size (works by batch_by_size implemented above)
         # should be tested later if it suits the framework(Christine)(18-12-2019)
         batch_sampler =batch_by_size(
-            indices, max_sentences=max_sentences
+            indices, max_sentences=max_sentences, required_batch_size_multiple=required_batch_size_multiple
         )
 
         # batches should be here returned correctly, mini batches should be ???

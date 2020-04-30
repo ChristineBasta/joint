@@ -188,30 +188,33 @@ class BatchTokenLoader(torchtext.data.Iterator):
         added_indices=[]
         deleted=[] #carry true for the btach that has some data deleted and False if not
         # make sure that the condition is right
+        batch_no=0
         while (len(ordered_indices)< len(self.data_reader_object.tokens_list)):
 
             deleted_indices_per_batch, added_indices_per_batch=self.get_batch_next()
 
             added_indices.append(added_indices_per_batch)
             deleted_indices.append(deleted_indices_per_batch)
-            if (len(deleted_indices_per_batch)>0):
-                deleted.append(True)
-            else:
-                deleted.append(False)
+
 
             #print('length of the batch:    '+str(len(self.batch)))
             if(self.batch_size > len(self.batch)):
                 break
-            #print(self.documents_in_prevbatch)
-            #print(self.batch)
+            print(self.documents_in_prevbatch)
+            print(self.batch)
             #print('deleted_indices_per_batch:   ')
             #print(deleted_indices_per_batch)
             #print('added_indices_per_batch:   ')
             #print(added_indices_per_batch)
 
             ordered_indices.extend(self.batch)
+            if (deleted_indices_per_batch):
+                deleted.append(True)
+            else:
+                deleted.append(False)
             #print(ordered_indices)
-        return ordered_indices
+            batch_no=batch_no+1
+        return ordered_indices,deleted
 
     # different indices to fill
     def indices_to_fill(self):

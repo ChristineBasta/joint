@@ -9,7 +9,7 @@ import torch
 # it is implemented and changed but methods should be tested individually ( 22-12-2019)
 #  make sure that it gets what we wants when we run it using the task
 def collate(
-    samples, pad_idx, eos_idx, left_pad_source=True, left_pad_target=False,
+    samples, pad_idx, eos_idx,batches_deleted, left_pad_source=True, left_pad_target=False,
     input_feeding=True,
     ):
     if len(samples) == 0:
@@ -74,6 +74,7 @@ def collate(
         },
 
         'target': target,
+        'deleted': batches_deleted #batches_deleted of the index
     }
     if prev_output_tokens is not None:
         batch['net_input']['prev_output_tokens'] = prev_output_tokens
@@ -117,6 +118,7 @@ class LanguagePairDataset(FairseqDataset):
         shuffle=False, input_feeding=True, remove_eos_from_source=False, append_eos_to_target=False,
         batch_size=8
     ):
+        self.batches_with_deleted=[]
         if tgt_dict is not None:
             assert src_dict.pad() == tgt_dict.pad()
             assert src_dict.eos() == tgt_dict.eos()
@@ -221,7 +223,7 @@ class LanguagePairDataset(FairseqDataset):
                   on the left if *left_pad_target* is ``True``.
         """
         return collate(
-            samples, pad_idx=self.src_dict.pad(), eos_idx=self.src_dict.eos(),
+            samples, pad_idx=self.src_dict.pad(), eos_idx=self.src_dict.eos(),batches_deleted=self.batches_with_deleted,
             left_pad_source=self.left_pad_source, left_pad_target=self.left_pad_target,
             input_feeding=self.input_feeding,
         )
@@ -241,8 +243,8 @@ class LanguagePairDataset(FairseqDataset):
         """Return an ordered list of indices. Batches will be constructed based
         on this order."""
 
-        indices= self.batchLoader.ordered_indices()
-
+        indices,deleted= self.batchLoader.ordered_indices()
+        self.batches_with_deleted = deleted
         return indices
 
     @property

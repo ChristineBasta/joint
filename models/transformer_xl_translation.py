@@ -1,8 +1,4 @@
-"""Fairseq-based implementation of the model proposed in
-   `"Joint Source-Target Self Attention with Locality Constraints" (Fonollosa, et al, 2019)
-    <https://>`_.
-   Author: Jose A. R. Fonollosa, Universitat Politecnica de Catalunya.
-"""
+
 import math
 
 import torch
@@ -639,6 +635,9 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
         # I think the mems should be initialized and updated in the forward of the jointTransformer
         #the dtype is updated here Christine 6-3-2020
         if not mems: mems = self.init_mems(prev_output_tokens.dtype)
+        # if the batch has any index deleted or changed, re-initialize the memory(16-4-2020)
+       # if( batch['deleted'] is True)  :
+        #   mems=self.init_mems(prev_output_tokens.dtype)
         tgt_len = prev_output_tokens.size(1)
         #check to know 26-2-2020
         embedding_dim = prev_output_tokens.size(2)
@@ -671,6 +670,7 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
             x += lang_emb
         #here x is the target
         x = F.dropout(x, p=self.dropout, training=self.training)
+        print(encoder_out)
         source = encoder_out['encoder_out']
         #concat source with x for implementing the new approach Carlos 25-2-2020
         concat_input_output = torch.cat(source, x, dim=1)
