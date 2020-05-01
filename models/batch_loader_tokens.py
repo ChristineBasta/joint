@@ -200,8 +200,8 @@ class BatchTokenLoader(torchtext.data.Iterator):
             #print('length of the batch:    '+str(len(self.batch)))
             if(self.batch_size > len(self.batch)):
                 break
-            print(self.documents_in_prevbatch)
-            print(self.batch)
+            #print(self.documents_in_prevbatch)
+            #print(self.batch)
             #print('deleted_indices_per_batch:   ')
             #print(deleted_indices_per_batch)
             #print('added_indices_per_batch:   ')
