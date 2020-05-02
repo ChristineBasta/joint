@@ -523,8 +523,8 @@ class ProtectedTransformerDecoderLayer(nn.Module):
             encoded output of shape `(batch, src_len, embed_dim)`
         """
         residual = x
-        print('size of input:')
-        print(x.size())
+        #print('size of input:')
+        #print(x.size())
         x = self.maybe_layer_norm(self.self_attn_layer_norm, x, before=True)
         if prev_self_attn_state is not None:
             if incremental_state is None:
