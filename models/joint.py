@@ -522,6 +522,7 @@ class ProtectedTransformerDecoderLayer(nn.Module):
         Returns:
             encoded output of shape `(batch, src_len, embed_dim)`
         """
+
         residual = x
         #print('size of input:')
         #print(x.size())

@@ -22,19 +22,22 @@ class PositionalEmbedding(nn.Module):
         super(PositionalEmbedding, self).__init__()
 
         self.demb = demb
-
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # ???(Christine)
         inv_freq = 1 / (10000 ** (torch.arange(0.0, demb, 2.0) / demb))
-        self.register_buffer('inv_freq', inv_freq)
+
+       # inv_freq_long = torch.tensor(inv_freq, dtype=torch.long, device=self.device)
+        # Christine 6-5-2020
+
+        self.register_buffer('inv_freq_long', inv_freq)
 
     def forward(self, pos_seq, bsz=None):
         # outer product of pos_seq and inv_freq
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        sinusoid_inp = torch.ger(pos_seq, self.inv_freq).to(device)
+        sinusoid_inp = torch.ger(pos_seq, self.inv_freq_long).to(self.device)
 
         # compute relative positional embedding
-        pos_emb = torch.cat([sinusoid_inp.sin(), sinusoid_inp.cos()], dim=-1).to(device)
+        pos_emb = torch.cat([sinusoid_inp.sin(), sinusoid_inp.cos()], dim=-1).to(self.device)
 
         if bsz is not None:
             # first -1 means the size does not change
@@ -90,6 +93,9 @@ class RelMultiHeadAttn(nn.Module):
         self.d_head = d_head
         self.dropout = dropout
         # first difference
+        print(d_model)
+        print(n_head)
+        print(d_head)
         self.qkv_net = nn.Linear(d_model, 3 * n_head * d_head, bias=False)
 
         self.drop = nn.Dropout(dropout)
@@ -175,7 +181,10 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
     # r_w_bias starts with parameter of number of heads and dimensions and then it is learnt during the forward
     def forward(self, w, r, r_w_bias, r_r_bias, attn_mask=None, mems=None):
         qlen, rlen, bsz = w.size(0), r.size(0), w.size(1)
-
+        print('mem shape')
+        print(mems.shape)
+        print('w shape')
+        print(w.shape)
         if mems is not None:
             cat = torch.cat([mems, w], 0)
             if self.pre_lnorm:
@@ -272,7 +281,7 @@ class RelPartialLearnableDecoderLayer(nn.Module):
         #we should check how they are calling the params
         n_heads=args.decoder_attention_heads
         embed_dim=args.decoder_embed_dim
-        d_heads=embed_dim/n_heads
+        d_heads=int(embed_dim/n_heads)
         dropout=args.attention_dropout
         d_inner= args.decoder_ffn_embed_dim
         #we reomved **kwargs Carlos 25-2-2020
@@ -290,7 +299,7 @@ class RelPartialLearnableDecoderLayer(nn.Module):
 
         return output
 
-@register_model('transformer_xl_translation')
+@register_model('transformer_xl_attention')
 class TransformerXLTranslationModel(FairseqModel):
     """
     Args:
@@ -345,6 +354,7 @@ class TransformerXLTranslationModel(FairseqModel):
         parser.add_argument('--language-embeddings', action='store_true',
                             help='use language embeddings')
 
+
     @classmethod
     def build_model(cls, args, task):
         """Build a new model instance."""
@@ -387,16 +397,16 @@ class TransformerXLTranslationModel(FairseqModel):
         else:
             if args.encoder_embed_dim != args.decoder_embed_dim:
                 raise ValueError(
-                    'The joint_attention model requires --encoder-embed-dim to match --decoder-embed-dim')
+                    'The transformer_xl_attention model requires --encoder-embed-dim to match --decoder-embed-dim')
             encoder_embed_tokens = build_embedding(
                 src_dict, args.encoder_embed_dim, args.encoder_embed_path
             )
             decoder_embed_tokens = build_embedding(
                 tgt_dict, args.decoder_embed_dim, args.decoder_embed_path
             )
-
+        mem_len=8   #Christine 6-5-2020
         encoder = TranformerXLEncoder(args, src_dict, encoder_embed_tokens, left_pad=args.left_pad_source)
-        decoder = TranformerXLDecoder(args, tgt_dict, decoder_embed_tokens, left_pad=args.left_pad_target)
+        decoder = TranformerXLDecoder(args, tgt_dict, decoder_embed_tokens,mem_len=mem_len, left_pad=args.left_pad_target)
         return TransformerXLTranslationModel(encoder, decoder)
 
 
@@ -420,11 +430,13 @@ class TranformerXLEncoder(FairseqEncoder):
 
         self.embed_tokens = embed_tokens
         self.embed_scale = math.sqrt(embed_dim)
-        # in our case, should be replaced by the other embeddings(Christine)
-        self.embed_positions = PositionalEmbedding(
-            args.max_source_positions, embed_dim, self.padding_idx,
-            learned=args.encoder_learned_pos,
-        ) if not args.no_token_positional_embeddings else None
+        # in our case, should be replaced by the other embeddings(Christine)(6-5-2020)
+        #self.embed_positions = PositionalEmbedding(
+        #    args.max_source_positions, embed_dim, self.padding_idx,
+        #    learned=args.encoder_learned_pos,
+        #) if not args.no_token_positional_embeddings else None
+
+        self.pos_emb=PositionalEmbedding(embed_dim)
         self.embed_language = LanguageEmbedding(embed_dim) if args.language_embeddings else None
 
         self.register_buffer('version', torch.Tensor([2]))
@@ -445,10 +457,14 @@ class TranformerXLEncoder(FairseqEncoder):
         """
         # embed tokens and positions
         x = self.embed_scale * self.embed_tokens(src_tokens)
+        print(x.shape)
+        print('Embed positions:')
+        print( self.pos_emb)
 
         # this should be edited by transformerXL (Christine)
-        if self.embed_positions is not None:
-            x += self.embed_positions(src_tokens)
+        #if self.embed_positions is not None: #what is this check (6-5-2020)
+            #do we have to keep this (6-5-2020)(for Carlos to ask)
+            #x += self.embed_positions(src_tokens)
 
         # language embedding
         if self.embed_language is not None:
@@ -488,12 +504,14 @@ class TranformerXLEncoder(FairseqEncoder):
                 encoder_out['encoder_padding_mask'].index_select(0, new_order)
         return encoder_out
 
+# removed because we do not need it in this version (6-5-2020)
+    '''
     def max_positions(self):
         """Maximum input length supported by the encoder."""
         if self.embed_positions is None:
             return self.max_source_positions
         return min(self.max_source_positions, self.embed_positions.max_positions())
-
+    '''
 
 class TranformerXLDecoder(FairseqIncrementalDecoder):
     """
@@ -507,7 +525,7 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
             ``False``
     """
 
-    def __init__(self, args, dictionary, embed_tokens, left_pad=False, final_norm=True):
+    def __init__(self, args, dictionary, embed_tokens, mem_len=None, left_pad=False, final_norm=True):
         super().__init__(dictionary)
         self.dropout = args.dropout
         self.share_input_output_embed = args.share_decoder_input_output_embed
@@ -526,6 +544,7 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
         # if the input embed dim coming from encoder is (Christine)
         self.project_in_dim = Linear(input_embed_dim, embed_dim, bias=False) if embed_dim != input_embed_dim else None
 
+        self.mem_len=mem_len
         #Carlos 25-2-2020
         '''
         self.embed_positions = PositionalEmbedding(
@@ -564,10 +583,10 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
 
         # initializing these embeddings for the relative embeddings
         #we take these from args Carlos 25-2-2020
-        self.embed_positions = PositionalEmbedding(embed_dim)
+        self.pos_emb = PositionalEmbedding(embed_dim)
         #change parameters
         n_heads=args.decoder_attention_heads
-        d_heads=embed_dim/n_heads
+        d_heads=int(embed_dim/n_heads)
         self.r_w_bias = nn.Parameter(torch.Tensor(n_heads, d_heads))
         self.r_r_bias = nn.Parameter(torch.Tensor(n_heads, d_heads))
         dropout = args.attention_dropout
@@ -578,13 +597,15 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
         if self.mem_len > 0:
             mems = []
             #param = next(self.parameters())
-
+            print(self.mem_len)
 
             for i in range(self.n_dec_layers + 1):
 
                 empty = torch.empty(0, dtype=dtype, device=self.device)
+                print(empty)
                 mems.append(empty)
 
+            print(len(mems))
             return mems
         else:
             return None
@@ -636,23 +657,30 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
         #the dtype is updated here Christine 6-3-2020
         if not mems: mems = self.init_mems(prev_output_tokens.dtype)
         # if the batch has any index deleted or changed, re-initialize the memory(16-4-2020)
-       # if( batch['deleted'] is True)  :
-        #   mems=self.init_mems(prev_output_tokens.dtype)
+        # done in train.py
+        print(prev_output_tokens.shape)
+        print(self.embed_tokens)
         tgt_len = prev_output_tokens.size(1)
-        #check to know 26-2-2020
-        embedding_dim = prev_output_tokens.size(2)
+
+
+        #check to know 26-2-2020 (wrong )
+
+        embedding_dim = self.embed_tokens.embedding_dim
+        print(embedding_dim)
 
         # embed positions
         ## will be edited with the new positional embeddings ? (Christine)
-        positions = self.embed_positions(
-            embedding_dim
-        ) if self.embed_positions is not None else None
+        ##For carlos later Christine 7-5-2020
+        #positions = self.embed_positions(
+        #    embedding_dim
+        #) if self.embed_positions is not None else None
 
         # what is incremental state? (Christine)
         if incremental_state is not None:
             prev_output_tokens = prev_output_tokens[:, -1:]
-            if positions is not None:
-                positions = positions[:, -1:]
+            ##For carlos later Christine 7-5-2020
+            #if positions is not None:
+            #    positions = positions[:, -1:]
 
         # embed tokens
         x = self.embed_scale * self.embed_tokens(prev_output_tokens)
@@ -670,22 +698,35 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
             x += lang_emb
         #here x is the target
         x = F.dropout(x, p=self.dropout, training=self.training)
-        print(encoder_out)
+
         source = encoder_out['encoder_out']
-        #concat source with x for implementing the new approach Carlos 25-2-2020
-        concat_input_output = torch.cat(source, x, dim=1)
-        #checkk here if the memory is the same shape
-        concat_with_memory =torch.cat(mems, concat_input_output, dim=1)
-
-
-        # B x T x C -> T x B x C
-        # ????
+        print('source shape:')
+        print(source.shape)
+        print('target shape:')
+        print(x.shape)
+        print(mems)
+        # the source is the same shape of target (seq_len, batch_size, embedding_dim) (Christine 7-5-2020)
         x = x.transpose(0, 1)
+        print(x.shape)
+        #concat source with x for implementing the new approach Carlos 25-2-2020
+        #if src and trg are of different seq length, should I add padding??
+        #check dimension of concat
+        concat_input_output = torch.cat([source, x], dim=0)
+        print(concat_input_output.shape)
+        # check here if the memory is the same shape
+        # mems initially are of decoder numbers,
+        #carlos 8-5-2020
+        #concat_with_memory =torch.cat([mems, concat_input_output], dim=1)
+
+
+
+
         attn = None
         # hidden?
         # inner states should take the whole concat with memory I guess (26-2-2020)
+        # what would be done by the internal states later Christine (7-5-2020)
         inner_states = [x]
-
+        print(len(inner_states))
         process_source = incremental_state is None or len(incremental_state) == 0
 
         # stopping here Carlos 25-2-2020
@@ -715,14 +756,17 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         pos_seq = torch.arange(klen - 1, -1, -1.0, device=device,
-                               dtype=concat_with_memory.dtype)
+                               dtype=concat_input_output.dtype)
 
         # po0s_emb is the positional embedding of the sequence, R in the paper
         pos_emb = self.pos_emb(pos_seq)
 
         core_out = self.drop(concat_input_output)
         pos_emb = self.drop(pos_emb)
-
+        print('coreout:')
+        print(core_out)
+        print('coreout shape:')
+        print(core_out.shape)
         for i, layer in enumerate(self.layers):
 
             if self.kernel_size_list is not None:
@@ -737,36 +781,16 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
                 self_attn_mask = torch.cat((zero_mask, target_mask), dim=1)
             else:
                 self_attn_mask = None
-            '''
-            state = incremental_state
-            if process_source:
-                if state is None:
-                    state = {}
-                if self.kernel_size_list is not None:
-                    source_mask = self.local_mask(source, self.kernel_size_list[i], causal=False)
-                else:
-                    source_mask = None
-                source, attn = layer(
-                    source,
-                    None,
-                    None,
-                    state,
-                    self_attn_mask=source_mask,
-                    self_attn_padding_mask=source_padding_mask
-                )
-                inner_states.append(source)
 
-            x, attn = layer(
-                x,
-                None,
-                None,
-                state,
-                self_attn_mask=self_attn_mask,
-                self_attn_padding_mask=self_attn_padding_mask
-            )
-            '''
-
+            print('self attention mask shape:')
+            print(self_attn_mask.shape)
+            #removing if process_source handling part, may add it later if necessary Christine 8-5-2020
+            #reving the layer implementation of joint
+            print('self attention mask')
+            print(self_attn_mask)
             mems_i = None if mems is None else mems[i]
+            print('memory of layer')
+            print(mems_i)
             # here it goes to the PartialRelLeranablelayer which we have above
             core_out = layer(core_out, pos_emb, self.r_w_bias,
                              self.r_r_bias, dec_attn_mask=self_attn_mask, mems=mems_i)
@@ -795,13 +819,14 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
         info = {'attn': attn, 'inner_states': inner_states}
 
         return pred, info , new_mems
-
+    # removed because we do not need it in this version (6-5-2020)
+    '''
     def max_positions(self):
         """Maximum output length supported by the decoder."""
         if self.embed_positions is None:
             return self.max_target_positions
         return min(self.max_target_positions, self.embed_positions.max_positions())
-
+    '''
     def buffered_future_mask(self, tensor):
         """Cached future mask."""
         dim = tensor.size(0)
@@ -989,7 +1014,7 @@ def Linear(in_features, out_features, bias=True):
     return m
 
 
-@register_model_architecture('joint_attention', 'joint_attention')
+@register_model_architecture('transformer_xl_attention', 'transformer_xl_attention')
 def base_architecture(args):
     args.encoder_embed_path = getattr(args, 'encoder_embed_path', None)
     args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 512)
@@ -1017,8 +1042,8 @@ def base_architecture(args):
     args.language_embeddings = getattr(args, 'language_embeddings', True)
 
 
-@register_model_architecture('joint_attention', 'joint_attention_iwslt_de_en')
-def joint_attention_iwslt_de_en(args):
+@register_model_architecture('transformer_xl_attention', 'transformer_xl_attention_iwslt_de_en')
+def transformer_xl_attention_iwslt_de_en(args):
     args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 256)
     args.decoder_embed_dim = getattr(args, 'decoder_embed_dim', 256)
     args.decoder_ffn_embed_dim = getattr(args, 'decoder_ffn_embed_dim', 1024)
@@ -1028,19 +1053,19 @@ def joint_attention_iwslt_de_en(args):
     base_architecture(args)
 
 
-@register_model_architecture('joint_attention', 'local_joint_attention_iwslt_de_en')
-def local_joint_attention_iwslt_de_en(args):
+@register_model_architecture('transformer_xl_attention', 'local_transformer_xl_attention_iwslt_de_en')
+def local_transformer_xl_attention_iwslt_de_en(args):
     args.kernel_size_list = getattr(args, 'kernel_size_list', [3, 5, 7, 9, 11, 13, 15, 17, 21, 25, 29, 33, 37, 41])
-    joint_attention_iwslt_de_en(args)
+    transformer_xl_attention_iwslt_de_en(args)
 
 
-@register_model_architecture('joint_attention', 'joint_attention_wmt_en_de')
-def joint_attention_wmt_en_de(args):
+@register_model_architecture('transformer_xl_attention', 'transformer_xl_attention_wmt_en_de')
+def transformer_xl_attention_wmt_en_de(args):
     base_architecture(args)
 
 
-@register_model_architecture('joint_attention', 'joint_attention_wmt_en_de_big')
-def joint_attention_wmt_en_de_big(args):
+@register_model_architecture('transformer_xl_attention', 'transformer_xl_attention_wmt_en_de_big')
+def transformer_xl_attention_wmt_en_de_big(args):
     args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 1024)
     args.decoder_embed_dim = getattr(args, 'decoder_embed_dim', 1024)
     args.decoder_ffn_embed_dim = getattr(args, 'decoder_ffn_embed_dim', 4096)
@@ -1050,19 +1075,19 @@ def joint_attention_wmt_en_de_big(args):
     base_architecture(args)
 
 
-@register_model_architecture('joint_attention', 'local_joint_attention_wmt_en_de_big')
-def local_joint_attention_wmt_en_de_big(args):
+@register_model_architecture('transformer_xl_attention', 'local_transformer_xl_attention_wmt_en_de_big')
+def local_transformer_xl_attention_wmt_en_de_big(args):
     args.kernel_size_list = getattr(args, 'kernel_size_list', [7, 15, 31, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63])
-    joint_attention_wmt_en_de_big(args)
+    transformer_xl_attention_wmt_en_de_big(args)
 
 
-@register_model_architecture('joint_attention', 'joint_attention_wmt_en_fr_big')
-def joint_attention_wmt_en_fr_big(args):
+@register_model_architecture('transformer_xl_attention', 'transformer_xl_attention_wmt_en_fr_big')
+def transformer_xl_attention_wmt_en_fr_big(args):
     args.dropout = getattr(args, 'dropout', 0.1)
-    joint_attention_wmt_en_de_big(args)
+    transformer_xl_attention_wmt_en_de_big(args)
 
 
-@register_model_architecture('joint_attention', 'local_joint_attention_wmt_en_fr_big')
-def local_joint_attention_wmt_en_fr_big(args):
+@register_model_architecture('transformer_xl_attention', 'local_transformer_xl_attention_wmt_en_fr_big')
+def local_transformer_xl_attention_wmt_en_fr_big(args):
     args.kernel_size_list = getattr(args, 'kernel_size_list', [7, 15, 31, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63])
-    joint_attention_wmt_en_fr_big(args)
+    transformer_xl_attention_wmt_en_de_big(args)

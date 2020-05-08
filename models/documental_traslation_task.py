@@ -15,9 +15,11 @@ from fairseq.data import (
 from fairseq.tasks import FairseqTask, register_task
 from models.data_reader import DataRawTextReader
 from models.documental_dataset import LanguagePairDataset
+from models.transformer_xl_translation import TranformerXLDecoder
 import numpy as np
 import types
 import fairseq.data.iterators as iterators
+import torch
 
 #the batch_by_size is tested but make sure it goes with the other parts well
 #maybe others methods need a special test or handling (22-12-2019)
@@ -393,3 +395,6 @@ class TranslationTransformerTask(FairseqTask):
 
 
 
+    def initiate_memory(self,i, list_batches_deleted,dtype):
+        if(list_batches_deleted[i]==True):
+           TranformerXLDecoder.init_mems(dtype)
