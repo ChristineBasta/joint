@@ -19,7 +19,7 @@ from fairseq.models import (
 )
 
 from .protected_multihead_attention import ProtectedMultiheadAttention
-
+import matplotlib.pyplot as plt
 @register_model('joint_attention')
 class JointAttentionModel(FairseqModel):
     """
@@ -375,7 +375,8 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
                 self_attn_mask = torch.cat((zero_mask, target_mask), dim=1)
             else:
                 self_attn_mask = None
-
+            plt.imshow(self_attn_mask)
+            plt.show()
             state = incremental_state
             if process_source:
                 if state is None:

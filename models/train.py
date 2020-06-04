@@ -120,7 +120,7 @@ def train(args, trainer, task, epoch_itr):
 
     for i, samples in enumerate(progress, start=epoch_itr.iterations_in_epoch):
         #Christine (6-5-2020)
-        dtype=samples[i]['net_input']['src_tokens'].dtype
+        dtype=samples[0]['net_input']['src_tokens'].dtype
         deleted_batches=samples[0]['deleted']
         task.initiate_memory(i, deleted_batches, dtype )
         log_output = trainer.train_step(samples)

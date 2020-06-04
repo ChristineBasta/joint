@@ -117,10 +117,10 @@ class DataRawTextReader(FairseqDataset):
         return os.path.exists(path)
 
     def add_src_token (self, line_src):
-        return '<src>'+line_src
+        return '<src> '+line_src
 
     def add_trg_token(self, line_trg):
-        return '<trg>' + line_trg
+        return '<trg> ' + line_trg
 
 if __name__ == "__main__":
     #path_src = '/home/christine/Phd/Cristina_cooperation/joint/corpus/train.tags.de-en.en'
