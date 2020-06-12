@@ -125,7 +125,12 @@ class ProtectedMultiheadAttention(nn.Module):
             k = k.contiguous().view(-1, bsz * self.num_heads, self.head_dim).transpose(0, 1)
         if v is not None:
             v = v.contiguous().view(-1, bsz * self.num_heads, self.head_dim).transpose(0, 1)
-
+        print('k shape:')
+        print(k.shape)
+        print('v shape:')
+        print(v.shape)
+        print('q shape:')
+        print(q.shape)
         if saved_state is not None:
             # saved states are stored with shape (bsz, num_heads, seq_len, head_dim)
             if 'prev_key' in saved_state:
@@ -140,11 +145,19 @@ class ProtectedMultiheadAttention(nn.Module):
                     v = prev_value
                 else:
                     v = torch.cat((prev_value, v), dim=1)
+
             saved_state['prev_key'] = k.view(bsz, self.num_heads, -1, self.head_dim)
             saved_state['prev_value'] = v.view(bsz, self.num_heads, -1, self.head_dim)
 
             self._set_input_buffer(incremental_state, saved_state)
-
+        print(' #############################################################################')
+        print('after adding prev states')
+        print('k shape:')
+        print(k.shape)
+        print('v shape:')
+        print(v.shape)
+        print('q shape:')
+        print(q.shape)
         src_len = k.size(1)
 
         if key_padding_mask is not None:

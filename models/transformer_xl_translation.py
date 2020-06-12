@@ -178,12 +178,6 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
     # r_w_bias starts with parameter of number of heads and dimensions and then it is learnt during the forward
     def forward(self, w, r, r_w_bias, r_r_bias,  incremental_state=None, attn_mask=None, mems=None):
         qlen, rlen, bsz = w.size(0), r.size(0), w.size(1)
-        print('rlen:')
-        print(rlen)
-        #print('mem shape:')
-        #print(mems.shape)
-        print('w shape:')
-        print(w.shape)
         ##########################################################################################
         #removed all static kv parts
         if incremental_state is not None:
@@ -227,6 +221,7 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
             # check?
             if 'prev_key' in saved_state:
                 prev_key = saved_state['prev_key'].view(-1, bsz, self.n_head*self.d_head)
+
                 # changed dim of cat, dim=0
                 w_head_k = torch.cat((prev_key, w_head_k), 0)
             if 'prev_value' in saved_state:
@@ -236,6 +231,12 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
             print(w_head_k.shape)
             print('w_head_v.shape after adding previous')
             print(w_head_v.shape)
+
+            w_1=w_head_k.view(-1, bsz, self.n_head, self.d_head)
+            w_1= w_1[-rlen:]
+
+            print('w_1:')
+            print(w_1.shape)
             saved_state['prev_key'] = w_head_k.view(-1, bsz, self.n_head, self.d_head)
             saved_state['prev_value'] = w_head_v.view(-1, bsz, self.n_head, self.d_head)
 
@@ -243,6 +244,11 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
 
         #####################################################################################################3
         klen = w_head_k.size(0)
+        print('klen:')
+        print(klen)
+
+        print('rlen:')
+        print(rlen)
 
         w_head_q = w_head_q.view(qlen, bsz, self.n_head, self.d_head)  # qlen x bsz x n_head x d_head
         w_head_k = w_head_k.view(klen, bsz, self.n_head, self.d_head)  # qlen x bsz x n_head x d_head
@@ -756,7 +762,7 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
         #) if self.embed_positions is not None else None
 
        #28 May (Christine), the shape may need adaptation
-        ####################################################################################333#we may need to change
+        #####################################################################################we may need to change
 
         if incremental_state is not None:
             prev_output_tokens = prev_output_tokens[:, -1:]
@@ -800,6 +806,7 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
 
 
 
+
         attn = None
         # hidden?
 
@@ -835,7 +842,8 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
         pos_src_emb = self.drop(pos_src_emb)
 
         #2 trg pos_emb
-        pos_trg_seq = torch.arange(qlen - 1, -1, -1.0, device=device,
+        src_trg_len=concat_input_output.size(0)
+        pos_trg_seq = torch.arange(src_trg_len - 1, -1, -1.0, device=device,
                                dtype=x.dtype)
         pos_emb = self.pos_emb(pos_trg_seq)
         pos_emb = self.drop(pos_emb)
@@ -848,8 +856,8 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
         pos_src_mem_emb = self.drop(pos_src_mem_emb)
 
         # 4 trg pos_emb
-
-        pos_seq = torch.arange(klen - 1, -1, -1.0, device=device,
+        src_trg_mem_len = concat_input_output.size(0)+mlen
+        pos_seq = torch.arange(src_trg_mem_len - 1, -1, -1.0, device=device,
                                dtype=x.dtype)
         pos_trg_mem_emb = self.pos_emb(pos_seq)
         pos_trg_mem_emb = self.drop(pos_trg_mem_emb)
@@ -902,20 +910,21 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
             target = layer(x, pos_emb, self.r_w_bias,
                              self.r_r_bias, state,dec_attn_mask=dec_attn_mask, mems=None)
             inner_states.append(target)
+            print('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
             # 28 May, Christine. the SRC with memory and then the TRG wih mem
             #where to update mems
-            if mems_i:
-                source_mem_mask = source.new_ones(srclen, srclen+mlen).byte()[:, :, None]
-                source_with_mem = layer(source, pos_src_mem_emb, self.r_w_bias,
-                                 self.r_r_bias, state, dec_attn_mask=source_mem_mask, mems=mems_i)
-                inner_states.append(source_with_mem)
-                dec_attn_mem_mask = torch.triu(x.new_ones(qlen, qlen), diagonal=1).byte()[:, :, None]
-                # check?
-                source_mem_mask = source.new_ones(qlen, srclen + mlen).byte()[:, :, None]
-                dec_attn_mem_mask = torch.cat([source_mem_mask, dec_attn_mem_mask], 1)
-                target_with_mem = layer(x, pos_trg_mem_emb, self.r_w_bias,
-                                 self.r_r_bias, state, dec_attn_mask=dec_attn_mem_mask, mems=mems_i)
-                inner_states.append(target_with_mem)
+            #passing mems part
+            source_mem_mask = source.new_ones(srclen, srclen+mlen).byte()[:, :, None]
+            source_with_mem = layer(source, pos_src_mem_emb, self.r_w_bias,
+                             self.r_r_bias, state, dec_attn_mask=source_mem_mask, mems=mems_i)
+            inner_states.append(source_with_mem)
+            dec_attn_mem_mask = torch.triu(x.new_ones(qlen, qlen), diagonal=1).byte()[:, :, None]
+            # check?
+            source_mem_mask = source.new_ones(qlen, srclen + mlen).byte()[:, :, None]
+            dec_attn_mem_mask = torch.cat([source_mem_mask, dec_attn_mem_mask], 1)
+            target_with_mem = layer(x, pos_trg_mem_emb, self.r_w_bias,
+                             self.r_r_bias, state, dec_attn_mask=dec_attn_mem_mask, mems=mems_i)
+            inner_states.append(target_with_mem)
             # 28 May, Christine. two layers for addition of memory
             #hids.append(core_out)
             inner_states.append(core_out)

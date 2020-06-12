@@ -403,6 +403,8 @@ class JointAttentionDecoder(FairseqIncrementalDecoder):
                 self_attn_mask=self_attn_mask,
                 self_attn_padding_mask=self_attn_padding_mask
             )
+            print('***********************************************************************')
+            print('End of layer')
             inner_states.append(x)
 
         if self.normalize:
@@ -531,6 +533,8 @@ class ProtectedTransformerDecoderLayer(nn.Module):
         if prev_self_attn_state is not None:
             if incremental_state is None:
                 incremental_state = {}
+            print('prev_self_attn_state')
+            print(prev_self_attn_state.shape)
             prev_key, prev_value = prev_self_attn_state
             saved_state = {"prev_key": prev_key, "prev_value": prev_value}
             self.self_attn._set_input_buffer(incremental_state, saved_state)
