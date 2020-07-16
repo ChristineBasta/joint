@@ -176,7 +176,7 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
     # r is pos_emb which starts by the p
     # mems = mems[i]
     # r_w_bias starts with parameter of number of heads and dimensions and then it is learnt during the forward
-    def forward(self, w, r, r_w_bias, r_r_bias,  incremental_state=None, attn_mask=None, mems=None):
+    def forward(self, w, r, r_w_bias, r_r_bias,  incremental_state=None, attn_mask=None, process_trg_source=False, mems=None):
         qlen, rlen, bsz = w.size(0), r.size(0), w.size(1)
         ##########################################################################################
         #removed all static kv parts
@@ -206,7 +206,7 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
 
             w_head_q, w_head_k, w_head_v = torch.chunk(w_heads, 3, dim=-1)
 
-        # to edit and save the saved stat
+        # to edit and save the saved stat...done by Christine
         ############################################################################################
         print(' #############################################################################')
         print('w_head_k.shape:')
@@ -215,28 +215,27 @@ class RelPartialLearnableMultiHeadAttn(RelMultiHeadAttn):
         print(w_head_v.shape)
         print('w_head_q.shape:')
         print(w_head_q.shape)
+        if mems is not None:
+            print('memories:')
+            print(mems.shape)
         if saved_state is not None:
             # saved states are stored with shape in joint version (bsz, num_heads, seq_len, head_dim)
             # I will save them here in the retrieving  # klen x bsz x n_head x d_head
             # check?
             if 'prev_key' in saved_state:
-                prev_key = saved_state['prev_key'].view(-1, bsz, self.n_head*self.d_head)
+                prev_key = saved_state['prev_key'].view(-1, bsz, self.n_head * self.d_head)
 
                 # changed dim of cat, dim=0
                 w_head_k = torch.cat((prev_key, w_head_k), 0)
             if 'prev_value' in saved_state:
-                prev_value = saved_state['prev_value'].view(-1, bsz, self.n_head*self.d_head)
+                prev_value = saved_state['prev_value'].view(-1, bsz, self.n_head * self.d_head)
                 w_head_v = torch.cat((prev_value, w_head_v), 0)
             print('w_head_k.shape after adding previous')
             print(w_head_k.shape)
             print('w_head_v.shape after adding previous')
             print(w_head_v.shape)
 
-            w_1=w_head_k.view(-1, bsz, self.n_head, self.d_head)
-            w_1= w_1[-rlen:]
 
-            print('w_1:')
-            print(w_1.shape)
             saved_state['prev_key'] = w_head_k.view(-1, bsz, self.n_head, self.d_head)
             saved_state['prev_value'] = w_head_v.view(-1, bsz, self.n_head, self.d_head)
 
@@ -369,8 +368,9 @@ class RelPartialLearnableDecoderLayer(nn.Module):
                                      pre_lnorm= args.decoder_normalize_before)
 
     def forward(self, dec_inp, r, r_w_bias, r_r_bias,incremental_state,
-                prev_self_attn_state=None, dec_attn_mask=None, mems=None):
+                prev_self_attn_state=None, dec_attn_mask=None, process_trg_source=False, mems=None):
 
+        #Done by Christine for the previous state
         ########################################3
         if prev_self_attn_state is not None:
             if incremental_state is None:
@@ -380,7 +380,7 @@ class RelPartialLearnableDecoderLayer(nn.Module):
             self.dec_attn._set_input_buffer(incremental_state, saved_state)
          ##################################
         output = self.dec_attn(dec_inp, r, r_w_bias, r_r_bias,incremental_state=incremental_state,
-                               attn_mask=dec_attn_mask,
+                               attn_mask=dec_attn_mask,process_trg_source=process_trg_source,
                                mems=mems)
         output = self.pos_ff(output)
 
@@ -612,7 +612,7 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
             ``False``
     """
 
-    def __init__(self, args, dictionary, embed_tokens, mem_len=None, left_pad=False, final_norm=True):
+    def __init__(self, args, dictionary, embed_tokens, mem_len=None,ext_len=None, left_pad=False, final_norm=True):
         super().__init__(dictionary)
         self.dropout = args.dropout
         self.share_input_output_embed = args.share_decoder_input_output_embed
@@ -632,6 +632,7 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
         self.project_in_dim = Linear(input_embed_dim, embed_dim, bias=False) if embed_dim != input_embed_dim else None
 
         self.mem_len=mem_len
+        self.ext_len = 0
         #Carlos 25-2-2020
         '''
         self.embed_positions = PositionalEmbedding(
@@ -701,6 +702,10 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
         if mems is None: return None
 
         # mems is not None
+        print('hidden states length:')
+        print(len(hids))
+        print('mems length:')
+        print(len(mems))
         assert len(hids) == len(mems), 'len(hids) != len(mems)'
 
         # There are `mlen + qlen` steps that can be cached into mems
@@ -802,22 +807,17 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
         concat_input_output = torch.cat([source, x], dim=0)
         print('shape of concat source+trg:')
         print(concat_input_output.shape)
-
-
-
-
-
         attn = None
         # hidden?
 
-        # what would be done by the internal states later Christine (7-5-2020)
+        # internal states later Christine (7-5-2020)
         inner_states = [x]
         print(len(inner_states))
         ######################################################################
         process_source = incremental_state is None or len(incremental_state) == 0
 
 
-        # this is the padding mask, Carlos was speaking about? (Christine)
+        # we are not using this padding? is ok? (Christine)
         source_padding_mask = encoder_out['encoder_padding_mask']
         if source_padding_mask is not None:
             target_padding_mask = source_padding_mask.new_zeros((source_padding_mask.size(0), tgt_len))
@@ -833,35 +833,33 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
         core_out = self.drop(x)
         print('coreout shape:')
         print(core_out.shape)
-        #1 src pos_emb
+        #1 src pos_emb, pos_emb is the positional embedding of the sequence, R in the paper
         srclen=source.size(0)
         pos_seq = torch.arange(srclen - 1, -1, -1.0, device=device,
                                dtype=source.dtype)
-        # pos_emb is the positional embedding of the sequence, R in the paper
         pos_src_emb = self.pos_emb(pos_seq)
         pos_src_emb = self.drop(pos_src_emb)
 
-        #2 trg pos_emb
+        #2 src+trg pos_emb
         src_trg_len=concat_input_output.size(0)
         pos_trg_seq = torch.arange(src_trg_len - 1, -1, -1.0, device=device,
                                dtype=x.dtype)
         pos_emb = self.pos_emb(pos_trg_seq)
         pos_emb = self.drop(pos_emb)
 
-        # 3 src with mem pos_emb
-        k_src_len=srclen+mlen
-        pos_seq = torch.arange(k_src_len - 1, -1, -1.0, device=device,
+        # 3 src+mem, but it will have saved states, so src+trg will be concatenated in the attention pos_emb
+        k_src_trg_len=(2*srclen)+(qlen)+mlen
+        pos_seq = torch.arange(k_src_trg_len - 1, -1, -1.0, device=device,
                                dtype=source.dtype)
         pos_src_mem_emb = self.pos_emb(pos_seq)
         pos_src_mem_emb = self.drop(pos_src_mem_emb)
 
-        # 4 trg pos_emb
-        src_trg_mem_len = concat_input_output.size(0)+mlen
-        pos_seq = torch.arange(src_trg_mem_len - 1, -1, -1.0, device=device,
+        # 4 src+trg+mem, but it will have saved states, so src+trg will be concatenated in the attention pos_emb pos_emb
+        k_src_trg_len = (2 * srclen) + (2*qlen) + mlen
+        pos_seq = torch.arange(k_src_trg_len - 1, -1, -1.0, device=device,
                                dtype=x.dtype)
         pos_trg_mem_emb = self.pos_emb(pos_seq)
         pos_trg_mem_emb = self.drop(pos_trg_mem_emb)
-
 
         for i, layer in enumerate(self.layers):
             '''
@@ -881,7 +879,6 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
                 self_attn_mask = None
             '''
 
-            dec_attn_mask = torch.triu( x.new_ones(qlen, klen), diagonal=1 + mlen).byte()[:, :, None]
 
 
             mems_i = None if mems is None else mems[i]
@@ -890,49 +887,71 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
             ############################################################################################################
             ####send state to the layers then
             state = incremental_state
-            # 28 May, Christine. the src only
+            # \the src only
             if process_source:
                 if state is None:
                     state = {}
                 source_mask=source.new_ones(srclen, srclen).byte()[:, :,None]
-                #28 May, Christine. edit the pos-Emb to be suitable for the source onl
+                #edit the pos-Emb to be suitable for the source only, Christine
                 source = layer(source, pos_src_emb, self.r_w_bias,
-                             self.r_r_bias, state,dec_attn_mask=source_mask, mems=None)
-                inner_states.append(source)
-            # 28 May, Christine. the trg only...mask trg with the same of trasnformer xl
-            dec_attn_mask = torch.triu(x.new_ones(qlen, qlen), diagonal=1).byte()[:, :, None]
+                             self.r_r_bias, state,dec_attn_mask=source_mask,process_trg_source=False,mems=None)
+                #inner_states.append(source)
 
-            #check?
+            # the trg only...mask trg with the same of trasnformer xl
+            dec_attn_mask = torch.triu(x.new_ones(qlen, qlen), diagonal=1).byte()[:, :, None]
+            #call for layers with target
             source_mask = source.new_ones(qlen, srclen).byte()[:, :, None]
             dec_attn_mask=torch.cat([source_mask,dec_attn_mask],1)
             print('dec_attn_mask  shape:')
             print(dec_attn_mask.shape)
             target = layer(x, pos_emb, self.r_w_bias,
-                             self.r_r_bias, state,dec_attn_mask=dec_attn_mask, mems=None)
-            inner_states.append(target)
+                             self.r_r_bias, state,dec_attn_mask=dec_attn_mask,process_trg_source=False, mems=None)
+            #inner_states.append(target)
             print('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
-            # 28 May, Christine. the SRC with memory and then the TRG wih mem
+            # the SRC with memory and then the TRG wih mem, by Christine.
             #where to update mems
             #passing mems part
+            process_prev_source=True
             source_mem_mask = source.new_ones(srclen, srclen+mlen).byte()[:, :, None]
-            source_with_mem = layer(source, pos_src_mem_emb, self.r_w_bias,
-                             self.r_r_bias, state, dec_attn_mask=source_mem_mask, mems=mems_i)
-            inner_states.append(source_with_mem)
-            dec_attn_mem_mask = torch.triu(x.new_ones(qlen, qlen), diagonal=1).byte()[:, :, None]
-            # check?
+            if (process_prev_source):
+                dec_attn_mask = torch.triu(x.new_ones(srclen, qlen), diagonal=1).byte()[:, :, None]
+                source_mask = source.new_ones(srclen, srclen).byte()[:, :, None]
+                dec_attn_mask = torch.cat([source_mask, dec_attn_mask], 1)
+                src_mem_attn_mask = torch.cat([dec_attn_mask, source_mem_mask], 1)
+            '''
+            target_mask=torch.triu(x.new_ones(qlen, qlen), diagonal=1).byte()[:, :, None]
+            dec_src_mem_attn_mask = torch.cat([source_mem_mask, target_mask], 1)
+            
+            '''
+            source_trg_with_mem = layer(source, pos_src_mem_emb, self.r_w_bias,
+                             self.r_r_bias, state, dec_attn_mask=src_mem_attn_mask,process_trg_source=True, mems=mems_i)
+            #inner_states.append(source_trg_with_mem)
+
+
+            #4
+            process_prev_trg=True
             source_mem_mask = source.new_ones(qlen, srclen + mlen).byte()[:, :, None]
+            dec_attn_mem_mask = torch.triu(x.new_ones(qlen, qlen), diagonal=1).byte()[:, :, None]
             dec_attn_mem_mask = torch.cat([source_mem_mask, dec_attn_mem_mask], 1)
+
+            if (process_prev_trg):
+                dec_attn_mask = torch.triu(x.new_ones(qlen, qlen), diagonal=1).byte()[:, :, None]
+                source_mask = source.new_ones(qlen, srclen).byte()[:, :, None]
+                dec_attn_mask = torch.cat([source_mask, dec_attn_mask], 1)
+                dec_attn_mem_mask = torch.cat([dec_attn_mask, dec_attn_mem_mask], 1)
             target_with_mem = layer(x, pos_trg_mem_emb, self.r_w_bias,
-                             self.r_r_bias, state, dec_attn_mask=dec_attn_mem_mask, mems=mems_i)
+                             self.r_r_bias, state, dec_attn_mask=dec_attn_mem_mask,process_trg_source=False, mems=mems_i)
             inner_states.append(target_with_mem)
+            
+            
+
             # 28 May, Christine. two layers for addition of memory
             #hids.append(core_out)
-            inner_states.append(core_out)
+            #inner_states.append(core_out)
         core_out = self.drop(core_out)
         new_mems = self._update_mems(inner_states, mems, mlen, qlen)
 
         #Christine 3-3-2020, changing all x her in coreout , maybe later we need to work only on target
-        #?????? carlos
         if self.normalize:
             core_out = self.layer_norm(core_out)
         # T x B x C -> B x T x C

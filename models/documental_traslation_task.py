@@ -395,6 +395,7 @@ class TranslationTransformerTask(FairseqTask):
 
 
 
-    def initiate_memory(self,i, list_batches_deleted,dtype):
+    def initiate_memory(self,i, list_batches_deleted,trainer,dtype):
+        print(trainer.get_model().decoder)
         if(list_batches_deleted[i]==True):
-           TranformerXLDecoder.init_mems(dtype)
+           trainer.get_model().decoder.init_mems(dtype)
