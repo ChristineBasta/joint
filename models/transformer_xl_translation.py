@@ -670,7 +670,7 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
 
 
         # initializing these embeddings for the relative embeddings
-        #we take these from args Carlos 25-2-2020
+        # we take these from args by Carlos
         self.pos_emb = PositionalEmbedding(embed_dim)
         #change parameters
         n_heads=args.decoder_attention_heads
@@ -893,6 +893,8 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
                     state = {}
                 source_mask=source.new_ones(srclen, srclen).byte()[:, :,None]
                 #edit the pos-Emb to be suitable for the source only, Christine
+                plt.imshow(source.new_ones(srclen, srclen))
+                plt.show()
                 source = layer(source, pos_src_emb, self.r_w_bias,
                              self.r_r_bias, state,dec_attn_mask=source_mask,process_trg_source=False,mems=None)
                 #inner_states.append(source)
@@ -904,6 +906,8 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
             dec_attn_mask=torch.cat([source_mask,dec_attn_mask],1)
             print('dec_attn_mask  shape:')
             print(dec_attn_mask.shape)
+            plt.imshow(dec_attn_mask)
+            plt.show()
             target = layer(x, pos_emb, self.r_w_bias,
                              self.r_r_bias, state,dec_attn_mask=dec_attn_mask,process_trg_source=False, mems=None)
             #inner_states.append(target)
@@ -926,7 +930,8 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
             source_trg_with_mem = layer(source, pos_src_mem_emb, self.r_w_bias,
                              self.r_r_bias, state, dec_attn_mask=src_mem_attn_mask,process_trg_source=True, mems=mems_i)
             #inner_states.append(source_trg_with_mem)
-
+            plt.imshow(src_mem_attn_mask)
+            plt.show()
 
             #4
             process_prev_trg=True
@@ -941,6 +946,9 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
                 dec_attn_mem_mask = torch.cat([dec_attn_mask, dec_attn_mem_mask], 1)
             target_with_mem = layer(x, pos_trg_mem_emb, self.r_w_bias,
                              self.r_r_bias, state, dec_attn_mask=dec_attn_mem_mask,process_trg_source=False, mems=mems_i)
+            plt.imshow(dec_attn_mem_mask)
+            plt.show()
+
             inner_states.append(target_with_mem)
             
             

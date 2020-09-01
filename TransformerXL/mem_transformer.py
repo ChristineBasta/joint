@@ -483,6 +483,7 @@ class RelPartialLearnableDecoderLayer(nn.Module):
                                      pre_lnorm=kwargs.get('pre_lnorm'))
 
     def forward(self, dec_inp, r, r_w_bias, r_r_bias, dec_attn_mask=None, mems=None):
+
         output = self.dec_attn(dec_inp, r, r_w_bias, r_r_bias,
                                attn_mask=dec_attn_mask,
                                mems=mems)
@@ -647,7 +648,7 @@ class MemTransformerLM(nn.Module):
     def _create_params(self):
         if self.attn_type == 0:  # default attention
             self.pos_emb = PositionalEmbedding(self.d_model)
-            self.r_w_bias = nn.Parameter(torch.Tensor(self.n_head, self.d_head))
+            self.r_w_biasr_w_bias = nn.Parameter(torch.Tensor(self.n_head, self.d_head))
             self.r_r_bias = nn.Parameter(torch.Tensor(self.n_head, self.d_head))
         elif self.attn_type == 1:  # learnable
             self.r_emb = nn.Parameter(torch.Tensor(
