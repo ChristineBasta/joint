@@ -894,8 +894,10 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
                 source_mask=source.new_zeros(srclen, srclen).byte()[:, :,None]
                 #edit the pos-Emb to be suitable for the source only, Christine
                 #drawing
+                '''
                 plt.imshow(source.new_zeros(srclen, srclen).byte())
                 plt.show()
+                '''
                 source = layer(source, pos_src_emb, self.r_w_bias,
                              self.r_r_bias, state,dec_attn_mask=source_mask,process_trg_source=False,mems=None)
                 #inner_states.append(source)
@@ -908,9 +910,11 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
             print('dec_attn_mask  shape:')
             print(dec_attn_mask.shape)
             #drawing
+            '''
             print(torch.cat([source.new_zeros(qlen, srclen), torch.triu(x.new_ones(qlen, qlen), diagonal=1) ],1))
             plt.imshow(torch.cat([source.new_zeros(qlen, srclen), torch.triu(x.new_ones(qlen, qlen), diagonal=1) ],1))
             plt.show()
+            '''
             target = layer(x, pos_emb, self.r_w_bias,
                              self.r_r_bias, state,dec_attn_mask=dec_attn_mask,process_trg_source=False, mems=None)
             #inner_states.append(target)
@@ -934,6 +938,7 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
                              self.r_r_bias, state, dec_attn_mask=src_mem_attn_mask,process_trg_source=True, mems=mems_i)
             #inner_states.append(source_trg_with_mem)
             #for drawing
+            '''
             source_mem_mask_1 = source.new_zeros(srclen, srclen + mlen).byte()[:, :]
             if (process_prev_source):
                 dec_attn_mask_1 = torch.triu(x.new_ones(srclen, qlen), diagonal=1).byte()[:, :]
@@ -944,6 +949,7 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
             print(src_mem_attn_mask_1)
             plt.imshow(src_mem_attn_mask_1)
             plt.show()
+            '''
             #4
             process_prev_trg=True
             source_mem_mask = source.new_zeros(qlen, srclen + mlen).byte()[:, :, None]
@@ -959,6 +965,7 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
                              self.r_r_bias, state, dec_attn_mask=dec_attn_mem_mask,process_trg_source=False, mems=mems_i)
 
             # for drawing
+            '''
             source_mem_mask_2 = source.new_zeros(qlen, srclen + mlen).byte()[:, :]
             dec_attn_mem_mask_2 = torch.triu(x.new_ones(qlen, qlen), diagonal=1).byte()[:, :]
             dec_attn_mem_mask_2= torch.cat([source_mem_mask_2, dec_attn_mem_mask_2], 1)
@@ -971,8 +978,9 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
 
             plt.imshow(dec_attn_mem_mask_2)
             plt.show()
+            '''
             inner_states.append(target_with_mem)
-            
+
             
 
             # 28 May, Christine. two layers for addition of memory
