@@ -380,6 +380,8 @@ class TranslationTransformerTask(FairseqTask):
             indices, max_sentences=max_sentences, required_batch_size_multiple=required_batch_size_multiple
         )
 
+        print('batch_sampler called here?????')
+
         # batches should be here returned correctly, mini batches should be ???
         # return a reusable, sharded iterator
         return iterators.EpochBatchIterator(

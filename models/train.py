@@ -75,9 +75,19 @@ def main(args, init_distributed=False):
     train_meter.start()
     valid_losses = [None]
     valid_subsets = args.valid_subset.split(',')
+
     while lr > args.min_lr and epoch_itr.epoch < max_epoch and trainer.get_num_updates() < max_update:
+        print('the starting of the iterator:')
+        print(epoch_itr)
         # train for one epoch
+        epoch_itr.frozen_batches = ([0, 893, 820, 194, 718, 444, 671, 941], [1, 894, 821, 195, 719, 445, 672, 942])
+        print('the starting of the iterator batches:')
+        print(epoch_itr.frozen_batches)
         train(args, trainer, task, epoch_itr)
+        print('the end of the iterator frozen batches:')
+        print(epoch_itr.frozen_batches)
+
+
 
         if not args.disable_validation and epoch_itr.epoch % args.validate_interval == 0:
             valid_losses = validate(args, trainer, task, epoch_itr, valid_subsets)
@@ -104,27 +114,41 @@ def train(args, trainer, task, epoch_itr):
     update_freq = args.update_freq[epoch_itr.epoch - 1] \
         if epoch_itr.epoch <= len(args.update_freq) else args.update_freq[-1]
 
+
     # Initialize data iterator
     itr = epoch_itr.next_epoch_itr(
         fix_batches_to_gpus=args.fix_batches_to_gpus,
         shuffle=False, # edited 5-5-2020 for not shuffling
     )
+    print('iterator in training:')
+    print(itr.iterable.batch_sampler)
+
     itr = iterators.GroupedIterator(itr, update_freq)
+    print('iterator in training-2:')
+    print(itr)
     progress = progress_bar.build_progress_bar(
         args, itr, epoch_itr.epoch, no_progress_bar='simple',
     )
-
+    print('iterator in training-2**:')
+    print(itr)
     extra_meters = collections.defaultdict(lambda: AverageMeter())
     valid_subsets = args.valid_subset.split(',')
     max_update = args.max_update or math.inf
+    print('iterator in training-3:')
+    print(epoch_itr.iterations_in_epoch)
+
+    print('progress:')
+    print(progress)
 
     for i, samples in enumerate(progress, start=epoch_itr.iterations_in_epoch):
         #Christine (6-5-2020)
+        print('samples:')
+        print(samples)
         dtype=samples[0]['net_input']['src_tokens'].dtype
-        print('dtype:')
-        print(dtype)
+        #print('dtype:')
+        #print(dtype)
         deleted_batches=samples[0]['deleted']
-        task.initiate_memory(i, deleted_batches, trainer, dtype )
+        task.initiate_memory(i, deleted_batches, trainer, dtype)
         log_output = trainer.train_step(samples)
         if log_output is None:
             continue
@@ -158,7 +182,12 @@ def train(args, trainer, task, epoch_itr):
         if num_updates >= max_update:
             break
 
-    # log end-of-epoch stats
+        if itr:
+            print('iterator is not empty')
+        else:
+            pri
+
+
     stats = get_training_stats(trainer)
     for k, meter in extra_meters.items():
         stats[k] = meter.avg
@@ -200,6 +229,9 @@ def get_training_stats(trainer):
 
 def validate(args, trainer, task, epoch_itr, subsets):
     """Evaluate the model on the validation set(s) and return the losses."""
+    print('epoch iterator in validation:')
+    print(epoch_itr.epoch)
+    print(epoch_itr.iterations_in_epoch)
     valid_losses = []
     for subset in subsets:
         # Initialize data iterator
@@ -250,6 +282,8 @@ def validate(args, trainer, task, epoch_itr, subsets):
             if args.best_checkpoint_metric == 'loss'
             else stats[args.best_checkpoint_metric]
         )
+    print('valid lossed:')
+    print(valid_losses)
     return valid_losses
 
 
