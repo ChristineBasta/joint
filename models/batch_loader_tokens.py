@@ -7,7 +7,7 @@ from fairseq.data import (
     Dictionary,
     data_utils
 )
-
+import random
 
 # once we have the documents loading in batch..we have to make sure that the same document is used till
 # Its sentences are finished
@@ -112,9 +112,18 @@ class BatchTokenLoader(torchtext.data.Iterator):
     def pick_random_documents(self, range_shuffle, no_documents_needed):
         # Carlos:  we can subtract total from what we have to get the free ones
         random_documents = []
+        list_to_shuffle=[]
+
+        for i in range(1,self.get_documents_size() + 1):
+            list_to_shuffle.append(i)
         #we can randomize only above certain size to discard the high changes of memory 2-3-2020
-        shuffler_index = self.random_shuffler(range_shuffle)
-        for i in shuffler_index:
+        #for i in range(2):
+        random.shuffle(list_to_shuffle)
+            #shuffler_index = self.random_shuffler(range_shuffle)
+        print('shuffler index:')
+        print(list_to_shuffle)
+
+        for i in list_to_shuffle:
             if (i not in self.total_documents_batched):
                 random_documents.append(i)
             if (len(random_documents) >= no_documents_needed):
@@ -188,6 +197,10 @@ class BatchTokenLoader(torchtext.data.Iterator):
         added_indices=[]
         deleted=[] #carry true for the btach that has some data deleted and False if not
         # make sure that the condition is right
+        self.batch = []  # should return tensor, but for now just sentences
+        self.total_documents_batched = []  # should be emptied each epoch (Carlos)
+        self.documents_in_prevbatch = {}
+        self.random_shuffler = utils.RandomShuffler()
         batch_no=0
         while (len(ordered_indices)< len(self.data_reader_object.tokens_list)):
 

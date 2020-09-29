@@ -79,13 +79,17 @@ def main(args, init_distributed=False):
     while lr > args.min_lr and epoch_itr.epoch < max_epoch and trainer.get_num_updates() < max_update:
         print('the starting of the iterator:')
         print(epoch_itr)
-        # train for one epoch
-        epoch_itr.frozen_batches = ([0, 893, 820, 194, 718, 444, 671, 941], [1, 894, 821, 195, 719, 445, 672, 942])
+
+        epoch_itr = trainer.get_train_iterator(epoch_itr.epoch)
+        print('the starting of the iterator epoch number:')
+        print(epoch_itr.epoch)
         print('the starting of the iterator batches:')
         print(epoch_itr.frozen_batches)
         train(args, trainer, task, epoch_itr)
         print('the end of the iterator frozen batches:')
         print(epoch_itr.frozen_batches)
+        # train for one epoch
+        #epoch_itr.frozen_batches = ([0, 893, 820, 194, 718, 444, 671, 941], [1, 894, 821, 195, 719, 445, 672, 942])
 
 
 
