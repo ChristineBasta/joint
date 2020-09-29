@@ -120,8 +120,8 @@ class BatchTokenLoader(torchtext.data.Iterator):
         #for i in range(2):
         random.shuffle(list_to_shuffle)
             #shuffler_index = self.random_shuffler(range_shuffle)
-        print('shuffler index:')
-        print(list_to_shuffle)
+        #print('shuffler index:')
+        #print(list_to_shuffle)
 
         for i in list_to_shuffle:
             if (i not in self.total_documents_batched):
@@ -134,7 +134,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
         if self.batch:
             max_size = self.batch[0].size()
             for batch_item in self.batch:
-                print(batch_item.size())
+                #print(batch_item.size())
                 if (batch_item.size() > max_size):
                     max_size = batch_item.size()
                 return max_size
@@ -147,7 +147,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
             """
         num = len(sequences)
         max_len = max([s.size(0) for s in sequences])
-        print(max_len)
+        #print(max_len)
 
         out_dims = (num, max_len)
         out_tensor = sequences[0].data.new(*out_dims).fill_(0)
@@ -167,7 +167,7 @@ class BatchTokenLoader(torchtext.data.Iterator):
             """
         if (sequences):
             tensor = torch.nn.utils.rnn.pad_sequence((sequences), batch_first=True, padding_value=1)
-            print(tensor)
+            #print(tensor)
         return tensor
 
     # to fill random documents in case of first fill or when documents just finish and we need to replace them

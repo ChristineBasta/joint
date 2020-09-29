@@ -147,7 +147,7 @@ def train(args, trainer, task, epoch_itr):
     for i, samples in enumerate(progress, start=epoch_itr.iterations_in_epoch):
         #Christine (6-5-2020)
         print('samples:')
-        print(samples)
+        #print(samples)
         dtype=samples[0]['net_input']['src_tokens'].dtype
         #print('dtype:')
         #print(dtype)
