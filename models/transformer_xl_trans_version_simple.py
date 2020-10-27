@@ -885,6 +885,7 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
                 dec_attn_mem_mask = torch.cat([dec_attn_mask, dec_attn_mem_mask], 1)
 
             # for drawing
+            '''
             print('draaaaaaaaaaaaawing')
 
             source_mem_mask_2 = source.new_zeros(srclen+qlen, srclen + mlen).byte()[:, :]
@@ -899,7 +900,7 @@ class TranformerXLDecoder(FairseqIncrementalDecoder):
 
             plt.imshow(dec_attn_mem_mask_2)
             plt.show()
-
+            '''
             target_with_mem = layer(concat_input_output, pos_trg_mem_emb, self.r_w_bias,
                              self.r_r_bias, state, dec_attn_mask=dec_attn_mem_mask,process_trg_source=False, mems=mems_i)
 
